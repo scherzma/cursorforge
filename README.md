@@ -38,6 +38,12 @@ Windows scales *other* apps' own cursors by the same factor, just as if you had 
 Your original scheme is backed up to `%APPDATA%\CursorForge\windows-cursors-backup.txt` and restored when the agent exits,
 is disabled, or on `CursorForge.Agent.exe --exit`.
 
+**Inverted fill.** "Invert" makes the fill show the inverse of whatever is behind it. With a black/white (or no)
+outline and hotspot dot it's written as a classic 1-bpp AND/XOR cursor, which the display hardware inverts
+itself; coloured parts need a 32-bpp masked-colour cursor that many drivers only support in software. Either way,
+over windows presented through hardware overlay planes (MPO; common for browsers and Electron apps) Windows can't
+invert and shows white instead, exactly like Windows' own inverted pointer.
+
 **Click flash (optional).** While a mouse button is held, the cursor switches to pre-rendered copies in your
 left/right click colours. They're loaded from the same multi-resolution files with `LR_DEFAULTSIZE`, so they're just as sharp.
 Button state is polled (`GetAsyncKeyState`) every 8 ms while the mouse is in use and every 100 ms when idle.
