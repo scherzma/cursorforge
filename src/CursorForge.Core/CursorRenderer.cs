@@ -52,18 +52,44 @@ public static class CursorRenderer
             ? Render(style)
             : WithHotspotDot(style, RenderCore(style, style.Size, style.Glow, style.Shadow, role, frame));
 
-    /// <summary>Paints the hotspot pixel (where Windows delivers the click) in the dot colour, fully opaque.</summary>
+    /// <summary>
+    /// Marks the hotspot (where Windows delivers the click) with a dot centred on that pixel: 1 px = just the
+    /// hotspot pixel, larger = an anti-aliased disc whose centre pixel is always the exact dot colour.
+    /// </summary>
     static RenderedCursor WithHotspotDot(CursorStyle style, RenderedCursor rc)
     {
         if (!style.HotspotDot) return rc;
         var c = Rgba.Parse(style.HotspotDotColor);
-        int i = (rc.HotY * rc.Width + rc.HotX) * 4;
-        rc.Pixels[i + 0] = ToByte(c.B);
-        rc.Pixels[i + 1] = ToByte(c.G);
-        rc.Pixels[i + 2] = ToByte(c.R);
-        rc.Pixels[i + 3] = 255;
+        float r = Math.Clamp(style.HotspotDotSize, 1, 32) / 2f;
+        int reach = (int)MathF.Ceiling(r);
+        for (int y = rc.HotY - reach; y <= rc.HotY + reach; y++)
+        {
+            if ((uint)y >= (uint)rc.Height) continue;
+            for (int x = rc.HotX - reach; x <= rc.HotX + reach; x++)
+            {
+                if ((uint)x >= (uint)rc.Width) continue;
+                bool centre = x == rc.HotX && y == rc.HotY;
+                float cov = centre ? 1 : Sat(r + 0.5f - Len(x - rc.HotX, y - rc.HotY));
+                if (cov <= 0) continue;
+                BlendStraight(rc.Pixels, (y * rc.Width + x) * 4, c, centre ? 1 : cov * c.A);
+            }
+        }
         return rc;
     }
+
+    /// <summary>Source-over of a colour onto a straight-alpha BGRA pixel.</summary>
+    static void BlendStraight(byte[] px, int i, Rgba c, float a)
+    {
+        float da = px[i + 3] / 255f, oa = a + da * (1 - a);
+        if (oa <= 0) return;
+        float k = da * (1 - a);
+        px[i + 0] = ToByte((c.B * a + px[i + 0] / 255f * k) / oa);
+        px[i + 1] = ToByte((c.G * a + px[i + 1] / 255f * k) / oa);
+        px[i + 2] = ToByte((c.R * a + px[i + 2] / 255f * k) / oa);
+        px[i + 3] = ToByte(oa);
+    }
+
+    static float Len(float x, float y) => MathF.Sqrt(x * x + y * y);
 
     /// <summary>
     /// Renders one frame for a Windows cursor scheme file: exactly canvas x canvas pixels. Windows shows the
@@ -77,6 +103,7 @@ public static class CursorRenderer
         var s = style.Clone();
         s.OutlineWidth *= k;
         s.GlowRadius *= k;
+        s.HotspotDotSize = MathF.Max(1, style.HotspotDotSize * k);
         int size = Math.Max(4, (int)MathF.Round(style.Size * k));
         RenderedCursor rc;
         while (true)
@@ -193,6 +220,7 @@ public static class CursorRenderer
         float sb = shadow ? MathF.Max(1.5f, size / 18f) : 0;
 
         float pad = MathF.Ceiling(ow + 1.5f + MathF.Max(glow ? gr * 1.6f : 0, shadow ? MathF.Max(sx, sy) + sb : 0));
+        if (s.HotspotDot) pad = MathF.Max(pad, MathF.Ceiling(s.HotspotDotSize / 2f + 1)); // room for a dot on the tip
         float half = g.CenterHotspot ? 0.5f : 0f; // put the centre of round shapes on a pixel centre
         // Pointers have a straight vertical left edge: land its outer (outline) edge exactly on a pixel
         // boundary so it stays one crisp column instead of being smeared across two.

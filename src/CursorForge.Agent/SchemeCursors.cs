@@ -137,7 +137,7 @@ internal static class SchemeCursors
     {
         var sb = new StringBuilder(RenderVersion).Append('|').Append(baseSize).Append('|').Append(cfg.StateCursors).Append('|');
         var s = cfg.Style;
-        sb.Append($"{s.Shape}|{s.Size}|{s.Fill}|{s.Outline}|{s.OutlineWidth}|{s.Glow}|{s.GlowColor}|{s.GlowRadius}|{s.GlowStrength}|{s.Shadow}|{s.Opacity}|{s.CustomHotX}|{s.CustomHotY}|{s.HotspotDot}|{s.HotspotDotColor}");
+        sb.Append($"{s.Shape}|{s.Size}|{s.Fill}|{s.Outline}|{s.OutlineWidth}|{s.Glow}|{s.GlowColor}|{s.GlowRadius}|{s.GlowStrength}|{s.Shadow}|{s.Opacity}|{s.CustomHotX}|{s.CustomHotY}|{s.HotspotDot}|{s.HotspotDotColor}|{s.HotspotDotSize}");
         var f = cfg.ClickFlash;
         if (f.Enabled) sb.Append($"|flash|{f.LeftColor}|{f.RightColor}");
         if (s.Shape == CursorShape.Custom)

@@ -231,6 +231,7 @@ public partial class MainWindow : Window
             _glow.Value = s.GlowColor;
             HotDotSwitch.IsChecked = s.HotspotDot;
             _hotDot.Value = s.HotspotDotColor;
+            HotDotSizeSlider.Value = s.HotspotDotSize;
             FlashSwitch.IsChecked = _cfg.ClickFlash.Enabled;
             _flashLeft.Value = _cfg.ClickFlash.LeftColor;
             _flashRight.Value = _cfg.ClickFlash.RightColor;
@@ -278,6 +279,7 @@ public partial class MainWindow : Window
         s.GlowColor = _glow.Value;
         s.HotspotDot = HotDotSwitch.IsChecked == true;
         s.HotspotDotColor = _hotDot.Value;
+        s.HotspotDotSize = (float)HotDotSizeSlider.Value;
         _cfg.ClickFlash.Enabled = FlashSwitch.IsChecked == true;
         _cfg.ClickFlash.LeftColor = _flashLeft.Value;
         _cfg.ClickFlash.RightColor = _flashRight.Value;
@@ -318,7 +320,8 @@ public partial class MainWindow : Window
         GlowStrengthValue.Text = $"{s.GlowStrength * 100:0}%";
         OpacityValue.Text = $"{s.Opacity * 100:0}%";
         GlowPanel.Visibility = s.Glow ? Visibility.Visible : Visibility.Collapsed;
-        HotDotHost.Visibility = s.HotspotDot ? Visibility.Visible : Visibility.Collapsed;
+        HotDotPanel.Visibility = s.HotspotDot ? Visibility.Visible : Visibility.Collapsed;
+        HotDotSizeValue.Text = $"{s.HotspotDotSize:0} px";
         bool custom = s.Shape == CursorShape.Custom;
         CustomPanel.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
         VectorOptions.Visibility = custom ? Visibility.Collapsed : Visibility.Visible;

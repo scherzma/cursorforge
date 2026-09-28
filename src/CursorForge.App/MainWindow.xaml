@@ -184,7 +184,15 @@
                             <CheckBox x:Name="HotDotSwitch" Style="{StaticResource Switch}" Content="Hotspot dot" Margin="0,20,0,0" Click="OnControlClick"/>
                             <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
                                        Text="A single pixel on the exact spot your clicks land."/>
-                            <ContentControl x:Name="HotDotHost" Focusable="False" Margin="0,10,0,0"/>
+                            <StackPanel x:Name="HotDotPanel">
+                                <ContentControl x:Name="HotDotHost" Focusable="False" Margin="0,10,0,0"/>
+                                <DockPanel Margin="0,14,0,0">
+                                    <TextBlock x:Name="HotDotSizeValue" DockPanel.Dock="Right" Style="{StaticResource ValueText}"/>
+                                    <TextBlock Text="Dot size" Style="{StaticResource FieldLabel}"/>
+                                </DockPanel>
+                                <Slider x:Name="HotDotSizeSlider" Minimum="1" Maximum="12" TickFrequency="1" IsSnapToTickEnabled="True"
+                                        ValueChanged="OnSliderChanged"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
