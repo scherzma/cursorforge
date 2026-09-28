@@ -151,6 +151,53 @@ public sealed class HotkeyBox : TextBox
     }
 }
 
+/// <summary>Small dark dialog asking for a name.</summary>
+public sealed class NameDialog : Window
+{
+    readonly TextBox _box;
+
+    public string Value => _box.Text.Trim();
+
+    public NameDialog(string title, string initial)
+    {
+        Title = title;
+        Width = 380;
+        SizeToContent = SizeToContent.Height;
+        ResizeMode = ResizeMode.NoResize;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ShowInTaskbar = false;
+        Background = (Brush)FindResource("Bg");
+        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
+        FontSize = 13;
+        SourceInitialized += (_, _) => NativeUi.ApplyDarkChrome(this);
+
+        _box = new TextBox { Text = initial, Tag = "Name" };
+        _box.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) Accept();
+            else if (e.Key == Key.Escape) DialogResult = false;
+        };
+        var ok = new Button { Style = (Style)FindResource("BtnPrimary"), Content = "Save", Padding = new Thickness(20, 7, 20, 7) };
+        ok.Click += (_, _) => Accept();
+        var cancel = new Button { Style = (Style)FindResource("Btn"), Content = "Cancel", Margin = new Thickness(0, 0, 8, 0) };
+        cancel.Click += (_, _) => DialogResult = false;
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(ok);
+
+        var root = new StackPanel { Margin = new Thickness(20) };
+        root.Children.Add(_box);
+        root.Children.Add(buttons);
+        Content = root;
+        Loaded += (_, _) => { _box.Focus(); _box.SelectAll(); };
+    }
+
+    void Accept()
+    {
+        if (Value.Length > 0) DialogResult = true;
+    }
+}
+
 /// <summary>Lists running apps that have a window, to add them to the overlay list.</summary>
 public sealed class PickAppWindow : Window
 {

@@ -52,6 +52,22 @@ public sealed class CursorStyle
     public float CustomHotY { get; set; }
 
     public CursorStyle Clone() => (CursorStyle)MemberwiseClone();
+
+    internal void Normalize()
+    {
+        Size = Math.Clamp(Size, 8, 200);
+        OutlineWidth = Math.Clamp(OutlineWidth, 0, 8);
+        GlowRadius = Math.Clamp(GlowRadius, 1, 24);
+        GlowStrength = Math.Clamp(GlowStrength, 0, 1);
+        Opacity = Math.Clamp(Opacity, 0.1f, 1);
+        CustomHotX = Math.Clamp(CustomHotX, 0, 1);
+        CustomHotY = Math.Clamp(CustomHotY, 0, 1);
+        Fill = Rgba.TryParse(Fill, out _) ? Fill : "#FFFFFFFF";
+        Outline = Rgba.TryParse(Outline, out _) ? Outline : "#FF000000";
+        GlowColor = Rgba.TryParse(GlowColor, out _) ? GlowColor : "#FF22D3EE";
+        HotspotDotColor = Rgba.TryParse(HotspotDotColor, out _) ? HotspotDotColor : "#FFFF3B30";
+        HotspotDotSize = Math.Clamp(HotspotDotSize, 1, 12);
+    }
 }
 
 public sealed class OverlayApp
@@ -81,6 +97,15 @@ public sealed class ClickFlash
     /// <summary>Minimum time the flash stays visible; it also lasts as long as the button is held.</summary>
     public int DurationMs { get; set; } = 150;
 
+    public ClickFlash Clone() => (ClickFlash)MemberwiseClone();
+
+    internal void Normalize()
+    {
+        DurationMs = Math.Clamp(DurationMs, 50, 1000);
+        LeftColor = Rgba.TryParse(LeftColor, out _) ? LeftColor : "#FFFFD60A";
+        RightColor = Rgba.TryParse(RightColor, out _) ? RightColor : "#FF22D3EE";
+    }
+
     /// <summary>The cursor style shown while the given button is down.</summary>
     public CursorStyle Apply(CursorStyle style, bool right)
     {
@@ -89,6 +114,22 @@ public sealed class ClickFlash
         if (s.Glow) s.GlowColor = s.Fill;
         return s;
     }
+}
+
+/// <summary>A look the user saved: style plus the settings that belong to how the cursor looks.</summary>
+public sealed class SavedPreset
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "";
+    public CursorStyle Style { get; set; } = new();
+    public ClickFlash ClickFlash { get; set; } = new();
+    public StateCursorMode StateCursors { get; set; } = StateCursorMode.Matching;
+
+    /// <summary>Value stored in <see cref="AppConfig.PresetId"/> while this preset is applied.</summary>
+    [JsonIgnore] public string Key => "user:" + Id;
+
+    /// <summary>Where a saved preset keeps its own copy of an imported image.</summary>
+    [JsonIgnore] public string ImagePath => Path.Combine(ConfigStore.Dir, "presets", Id + ".cfimg");
 }
 
 public sealed class Hotkey
@@ -119,6 +160,7 @@ public sealed class AppConfig
     public StateCursorMode StateCursors { get; set; } = StateCursorMode.Matching;
 
     public ClickFlash ClickFlash { get; set; } = new();
+    public List<SavedPreset> SavedPresets { get; set; } = [];
 
     public bool OverlayEnabled { get; set; } = true;
     public List<OverlayApp> OverlayApps { get; set; } = [];
@@ -142,23 +184,19 @@ public sealed class AppConfig
         ToggleHotkey ??= new();
         OverlayHotkey ??= new();
         ClickFlash ??= new();
-        ClickFlash.DurationMs = Math.Clamp(ClickFlash.DurationMs, 50, 1000);
-        ClickFlash.LeftColor = Rgba.TryParse(ClickFlash.LeftColor, out _) ? ClickFlash.LeftColor : "#FFFFD60A";
-        ClickFlash.RightColor = Rgba.TryParse(ClickFlash.RightColor, out _) ? ClickFlash.RightColor : "#FF22D3EE";
+        ClickFlash.Normalize();
         PresetId ??= "";
-        var s = Style;
-        s.Size = Math.Clamp(s.Size, 8, 200);
-        s.OutlineWidth = Math.Clamp(s.OutlineWidth, 0, 8);
-        s.GlowRadius = Math.Clamp(s.GlowRadius, 1, 24);
-        s.GlowStrength = Math.Clamp(s.GlowStrength, 0, 1);
-        s.Opacity = Math.Clamp(s.Opacity, 0.1f, 1);
-        s.CustomHotX = Math.Clamp(s.CustomHotX, 0, 1);
-        s.CustomHotY = Math.Clamp(s.CustomHotY, 0, 1);
-        s.Fill = Rgba.TryParse(s.Fill, out _) ? s.Fill : "#FFFFFFFF";
-        s.Outline = Rgba.TryParse(s.Outline, out _) ? s.Outline : "#FF000000";
-        s.GlowColor = Rgba.TryParse(s.GlowColor, out _) ? s.GlowColor : "#FF22D3EE";
-        s.HotspotDotColor = Rgba.TryParse(s.HotspotDotColor, out _) ? s.HotspotDotColor : "#FFFF3B30";
-        s.HotspotDotSize = Math.Clamp(s.HotspotDotSize, 1, 12);
+        Style.Normalize();
+        SavedPresets ??= [];
+        SavedPresets.RemoveAll(p => p is null || p.Style is null);
+        foreach (var p in SavedPresets)
+        {
+            p.Style.Normalize();
+            p.ClickFlash ??= new();
+            p.ClickFlash.Normalize();
+            p.Name = string.IsNullOrWhiteSpace(p.Name) ? "My cursor" : p.Name.Trim();
+            if (string.IsNullOrWhiteSpace(p.Id)) p.Id = Guid.NewGuid().ToString("N");
+        }
         OverlayApps.RemoveAll(a => a is null || string.IsNullOrWhiteSpace(a.Process));
     }
 }

@@ -1,4 +1,4 @@
-﻿<Window x:Class="CursorForge.Ui.MainWindow"
+<Window x:Class="CursorForge.Ui.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:CursorForge.Ui"
@@ -30,7 +30,7 @@
                 </Border>
                 <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="CursorForge" FontSize="21" FontWeight="SemiBold" FontFamily="Segoe UI Variable Display, Segoe UI"/>
-                    <TextBlock Text="Custom cursors Â· zero added latency" Foreground="{StaticResource Muted}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Custom cursors · zero added latency" Foreground="{StaticResource Muted}" Margin="0,1,0,0"/>
                 </StackPanel>
             </StackPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -63,11 +63,24 @@
             <Border Style="{StaticResource Card}" Padding="20,18,8,8">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,12,0">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource BtnPrimary}" Content="Save current…" Padding="14,6"
+                                Margin="12,0,0,0" Click="OnSavePreset"/>
                         <TextBlock x:Name="PresetHint" DockPanel.Dock="Right" Style="{StaticResource Hint}" VerticalAlignment="Center"/>
-                        <TextBlock Text="Presets" Style="{StaticResource CardTitle}"/>
+                        <TextBlock Text="Presets" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
                     </DockPanel>
                     <ScrollViewer x:Name="PresetScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,14,0,0">
-                        <WrapPanel x:Name="PresetPanel"/>
+                        <StackPanel>
+                            <StackPanel x:Name="MyPresetsSection">
+                                <DockPanel Margin="2,0,12,10">
+                                    <TextBlock DockPanel.Dock="Right" Style="{StaticResource Hint}" VerticalAlignment="Center"
+                                               Text="Right-click to rename, update or delete"/>
+                                    <TextBlock Text="My presets" Style="{StaticResource FieldLabel}"/>
+                                </DockPanel>
+                                <WrapPanel x:Name="MyPresetPanel"/>
+                                <TextBlock Text="Built-in" Style="{StaticResource FieldLabel}" Margin="2,6,0,10"/>
+                            </StackPanel>
+                            <WrapPanel x:Name="PresetPanel"/>
+                        </StackPanel>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
@@ -121,7 +134,7 @@
 
                             <StackPanel x:Name="CustomPanel" Visibility="Collapsed" Margin="0,6,0,0">
                                 <StackPanel Orientation="Horizontal">
-                                    <Button Content="Import imageâ€¦" Style="{StaticResource Btn}" Click="OnImportImage"/>
+                                    <Button Content="Import image…" Style="{StaticResource Btn}" Click="OnImportImage"/>
                                     <TextBlock Text="Hotspot" VerticalAlignment="Center" Margin="16,0,8,0" Foreground="{StaticResource Muted}"/>
                                     <RadioButton x:Name="HotTopLeft" Style="{StaticResource Seg}" GroupName="hot" Content="Top-left" Click="OnHotspotClick"/>
                                     <RadioButton x:Name="HotCenter" Style="{StaticResource Seg}" GroupName="hot" Content="Center" Click="OnHotspotClick"/>
@@ -137,7 +150,7 @@
                             <Slider x:Name="SizeSlider" Minimum="8" Maximum="96" SmallChange="1" LargeChange="4"
                                     IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="OnSliderChanged"/>
                             <DockPanel Margin="0,4,0,0">
-                                <Button DockPanel.Dock="Right" Style="{StaticResource BtnGhost}" Content="Windows settingâ€¦"
+                                <Button DockPanel.Dock="Right" Style="{StaticResource BtnGhost}" Content="Windows setting…"
                                         Padding="8,3" FontSize="12" Click="OnOpenPointerSettings"/>
                                 <TextBlock x:Name="SizeLimitText" Style="{StaticResource Hint}" VerticalAlignment="Center"/>
                             </DockPanel>
@@ -257,7 +270,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBox x:Name="AddAppBox" Tag="game.exe" KeyDown="OnAddAppKey"/>
                             <Button Grid.Column="1" Content="Add" Style="{StaticResource BtnPrimary}" Margin="8,0,0,0" Padding="18,8" Click="OnAddApp"/>
-                            <Button Grid.Column="2" Content="Pick running appâ€¦" Style="{StaticResource Btn}" Margin="8,0,0,0" Click="OnPickApp"/>
+                            <Button Grid.Column="2" Content="Pick running app…" Style="{StaticResource Btn}" Margin="8,0,0,0" Click="OnPickApp"/>
                         </Grid>
                         <StackPanel x:Name="AppsList" Margin="0,14,0,0"/>
                         <TextBlock x:Name="AppsEmpty" Style="{StaticResource Hint}" Margin="0,4,0,0"
@@ -333,11 +346,11 @@
                         <StackPanel>
                             <TextBlock Text="Why it's fast" Style="{StaticResource CardTitle}"/>
                             <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" FontSize="12.5" LineHeight="20">
-                                <Run Text="â€¢  Standard cursors are swapped inside Windows itself, and the GPU hardware cursor keeps drawing them. Latency is identical to the stock Windows cursor."/>
+                                <Run Text="•  Standard cursors are swapped inside Windows itself, and the GPU hardware cursor keeps drawing them. Latency is identical to the stock Windows cursor."/>
                                 <LineBreak/>
-                                <Run Text="â€¢  The agent is a native ~3 MB program. It sleeps in its message loop and uses 0% CPU when idle."/>
+                                <Run Text="•  The agent is a native ~4 MB program. It sleeps in its message loop and uses 0% CPU when idle."/>
                                 <LineBreak/>
-                                <Run Text="â€¢  The overlay thread only wakes while an overlay game is focused, and it disappears while the game hides the cursor. Games that aim with a hidden cursor keep their normal fullscreen presentation path."/>
+                                <Run Text="•  The overlay thread only wakes while an overlay game is focused, and it disappears while the game hides the cursor. Games that aim with a hidden cursor keep their normal fullscreen presentation path."/>
                             </TextBlock>
                         </StackPanel>
                     </Border>

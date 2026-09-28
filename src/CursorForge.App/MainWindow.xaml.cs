@@ -16,7 +16,8 @@ public partial class MainWindow : Window
     readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
     readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     readonly ColorRow _fill = new(), _outline = new(), _glow = new(), _flashLeft = new(), _flashRight = new(), _hotDot = new();
-    readonly List<(RadioButton Button, Preset Preset)> _presetButtons = [];
+    readonly List<(RadioButton Button, string Id)> _presetButtons = [];
+    string _savedSignature = "";
     readonly Dictionary<CursorShape, (RadioButton Button, Image? Icon)> _shapeButtons = [];
     readonly Dictionary<CursorRole, Image> _stateImages = [];
     readonly Dictionary<CursorRole, BitmapSource[]> _stateFrames = [];
@@ -109,31 +110,88 @@ public partial class MainWindow : Window
     void BuildPresetTiles()
     {
         PresetPanel.Children.Clear();
+        MyPresetPanel.Children.Clear();
         _presetButtons.Clear();
+
+        foreach (var saved in _cfg.SavedPresets)
+        {
+            var rb = MakeTile(saved.Name, SavedPreview(saved));
+            rb.Click += (_, _) => ApplySaved(saved);
+            rb.ContextMenu = SavedMenu(saved);
+            MyPresetPanel.Children.Add(rb);
+            _presetButtons.Add((rb, saved.Key));
+        }
+        MyPresetsSection.Visibility = _cfg.SavedPresets.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _savedSignature = SavedSignature();
+
         foreach (var preset in Presets.All)
         {
-            var img = new Image
-            {
-                Source = ToBitmap(CursorRenderer.Render(preset.Style)),
-                Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly,
-                MaxWidth = 76, MaxHeight = 76,
-                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            };
-            var content = new DockPanel();
-            var label = new TextBlock
-            {
-                Text = preset.Name, FontSize = 12, FontWeight = FontWeights.SemiBold,
-                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 4),
-            };
-            DockPanel.SetDock(label, Dock.Bottom);
-            content.Children.Add(label);
-            content.Children.Add(img);
-
-            var rb = new RadioButton { Style = (Style)FindResource("Tile"), Content = content, GroupName = "presets" };
+            var rb = MakeTile(preset.Name, preset.Style);
             rb.Click += (_, _) => ApplyPreset(preset);
             PresetPanel.Children.Add(rb);
-            _presetButtons.Add((rb, preset));
+            _presetButtons.Add((rb, preset.Id));
         }
+    }
+
+    RadioButton MakeTile(string name, CursorStyle style)
+    {
+        var img = new Image
+        {
+            Source = ToBitmap(CursorRenderer.Render(style)),
+            Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly,
+            MaxWidth = 76, MaxHeight = 76,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
+        var content = new DockPanel();
+        var label = new TextBlock
+        {
+            Text = name, FontSize = 12, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(4, 0, 4, 4),
+        };
+        DockPanel.SetDock(label, Dock.Bottom);
+        content.Children.Add(label);
+        content.Children.Add(img);
+        return new RadioButton { Style = (Style)FindResource("Tile"), Content = content, GroupName = "presets", ToolTip = name };
+    }
+
+    /// <summary>
+    /// Tile preview for a saved preset. The renderer draws custom images from the currently imported file,
+    /// so a custom-image preset only previews correctly while its own image is the imported one.
+    /// </summary>
+    static CursorStyle SavedPreview(SavedPreset p)
+    {
+        if (p.Style.Shape != CursorShape.Custom) return p.Style;
+        var own = CustomImage.TryLoad(p.ImagePath);
+        var current = CustomImage.TryLoad(ConfigStore.CustomImagePath);
+        bool same = own != null && current != null && own.Pixels.AsSpan().SequenceEqual(current.Pixels);
+        if (same) return p.Style;
+        var s = p.Style.Clone();
+        s.Shape = CursorShape.Arrow; // stand-in so the tile still shows the colours
+        return s;
+    }
+
+    /// <summary>Changes whenever the saved presets change, so tiles are rebuilt only when needed.</summary>
+    string SavedSignature() => string.Join("|", _cfg.SavedPresets.Select(p =>
+        p.Id + ":" + p.Name + ":" + System.Text.Json.JsonSerializer.Serialize(
+            new[] { p.Style.Shape.ToString(), p.Style.Size.ToString(), p.Style.Fill, p.Style.Outline, p.Style.OutlineWidth.ToString(),
+                    p.Style.Glow.ToString(), p.Style.GlowColor, p.Style.Shadow.ToString(), p.Style.Opacity.ToString(),
+                    p.Style.HotspotDot.ToString(), p.Style.HotspotDotColor, p.Style.HotspotDotSize.ToString() })));
+
+    ContextMenu SavedMenu(SavedPreset saved)
+    {
+        var menu = new ContextMenu();
+        void Add(string header, Action action)
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) => action();
+            menu.Items.Add(item);
+        }
+        Add("Apply", () => ApplySaved(saved));
+        Add("Update with current settings", () => UpdateSaved(saved));
+        Add("Rename…", () => RenameSaved(saved));
+        menu.Items.Add(new Separator());
+        Add("Delete", () => DeleteSaved(saved));
+        return menu;
     }
 
     void BuildShapeButtons()
@@ -243,7 +301,8 @@ public partial class MainWindow : Window
             StatesSame.IsChecked = _cfg.StateCursors == StateCursorMode.Same;
 
             foreach (var (shape, (btn, _)) in _shapeButtons) btn.IsChecked = shape == s.Shape;
-            foreach (var (btn, preset) in _presetButtons) btn.IsChecked = preset.Id == _cfg.PresetId;
+            if (SavedSignature() != _savedSignature) BuildPresetTiles(); // saved presets changed (e.g. reloaded)
+            foreach (var (btn, id) in _presetButtons) btn.IsChecked = id == _cfg.PresetId;
 
             OverlaySwitch.IsChecked = _cfg.OverlayEnabled;
             AutostartSwitch.IsChecked = _cfg.StartWithWindows;
@@ -327,7 +386,9 @@ public partial class MainWindow : Window
         VectorOptions.Visibility = custom ? Visibility.Collapsed : Visibility.Visible;
 
         var preset = Presets.Find(_cfg.PresetId);
-        PresetHint.Text = preset == null ? "Custom style" : $"Based on {preset.Name}";
+        var savedPreset = _cfg.SavedPresets.FirstOrDefault(p => p.Key == _cfg.PresetId);
+        PresetHint.Text = preset != null ? $"Based on {preset.Name}"
+            : savedPreset != null ? $"Based on {savedPreset.Name}" : "Custom style";
 
         var rc = CursorRenderer.Render(shown);
         var bmp = ToBitmap(rc);
@@ -397,6 +458,92 @@ public partial class MainWindow : Window
         UpdateAgentStatus();
     }
 
+    // ------------------------------------------------------------------ saved presets
+
+    void OnSavePreset(object sender, RoutedEventArgs e)
+    {
+        int n = _cfg.SavedPresets.Count + 1;
+        string suggestion = "My cursor " + n;
+        while (_cfg.SavedPresets.Any(p => p.Name == suggestion)) suggestion = "My cursor " + ++n;
+        var dlg = new NameDialog("Save preset", suggestion) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+
+        var saved = new SavedPreset { Name = dlg.Value };
+        CaptureInto(saved);
+        _cfg.SavedPresets.Add(saved);
+        _cfg.PresetId = saved.Key;
+        BuildPresetTiles();
+        LoadIntoControls();
+        ScheduleSave();
+    }
+
+    /// <summary>Copies the current look into a saved preset, with its own copy of an imported image.</summary>
+    void CaptureInto(SavedPreset saved)
+    {
+        saved.Style = _cfg.Style.Clone();
+        saved.ClickFlash = _cfg.ClickFlash.Clone();
+        saved.StateCursors = _cfg.StateCursors;
+        try
+        {
+            if (saved.Style.Shape == CursorShape.Custom && File.Exists(ConfigStore.CustomImagePath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(saved.ImagePath)!);
+                File.Copy(ConfigStore.CustomImagePath, saved.ImagePath, overwrite: true);
+            }
+            else if (File.Exists(saved.ImagePath)) File.Delete(saved.ImagePath);
+        }
+        catch { }
+    }
+
+    void ApplySaved(SavedPreset saved)
+    {
+        _cfg.Style = saved.Style.Clone();
+        _cfg.ClickFlash = saved.ClickFlash.Clone();
+        _cfg.StateCursors = saved.StateCursors;
+        _cfg.PresetId = saved.Key;
+        if (saved.Style.Shape == CursorShape.Custom && File.Exists(saved.ImagePath))
+        {
+            try { File.Copy(saved.ImagePath, ConfigStore.CustomImagePath, overwrite: true); }
+            catch { }
+        }
+        BuildPresetTiles(); // custom-image previews depend on which image is imported
+        LoadIntoControls();
+        ScheduleSave();
+    }
+
+    void UpdateSaved(SavedPreset saved)
+    {
+        CaptureInto(saved);
+        _cfg.PresetId = saved.Key;
+        BuildPresetTiles();
+        LoadIntoControls();
+        ScheduleSave();
+    }
+
+    void RenameSaved(SavedPreset saved)
+    {
+        var dlg = new NameDialog("Rename preset", saved.Name) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        saved.Name = dlg.Value;
+        BuildPresetTiles();
+        LoadIntoControls();
+        ScheduleSave();
+    }
+
+    void DeleteSaved(SavedPreset saved)
+    {
+        var answer = MessageBox.Show(this, $"Delete the preset \u201C{saved.Name}\u201D?", "CursorForge",
+            MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+        _cfg.SavedPresets.Remove(saved);
+        try { if (File.Exists(saved.ImagePath)) File.Delete(saved.ImagePath); }
+        catch { }
+        if (_cfg.PresetId == saved.Key) _cfg.PresetId = "";
+        BuildPresetTiles();
+        LoadIntoControls();
+        ScheduleSave();
+    }
+
     void ApplyPreset(Preset preset)
     {
         _cfg.PresetId = preset.Id;
@@ -443,6 +590,7 @@ public partial class MainWindow : Window
             s.CustomHotX = hx;
             s.CustomHotY = hy;
             s.Size = Math.Clamp(Math.Max(img.Width, img.Height), 24, 96);
+            BuildPresetTiles(); // saved custom-image presets preview from the imported image
             LoadIntoControls();
             ScheduleSave();
             return true;
