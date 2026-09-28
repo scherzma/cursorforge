@@ -1,7 +1,17 @@
 // Generates assets/app.ico from the cursor renderer, so the app icon matches the cursors it makes.
+using System.IO;
 using CursorForge;
 
 if (args is ["--sheet", var sheetPath]) { WriteSheet(sheetPath); return; }
+if (args is ["--readme", var readmeDir])
+{
+    // WPF rendering needs an STA thread.
+    var t = new Thread(() => ReadmeImages.Write(readmeDir));
+    t.SetApartmentState(ApartmentState.STA);
+    t.Start();
+    t.Join();
+    return;
+}
 
 string output = args.Length > 0 ? args[0] : "app.ico";
 var style = new CursorStyle

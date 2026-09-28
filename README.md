@@ -3,6 +3,20 @@
 A free, lightweight YoloMouse alternative for Windows: custom cursors with **zero added latency**.
 It has a full matching set of state cursors and an anti-cheat-friendly overlay for games that draw their own cursor.
 
+![CursorForge settings window](docs/app.png)
+
+## Presets
+
+15 built-in looks to start from. Tweak shape, size, colours, outline, glow, shadow and opacity, or import your own
+image, then save the result as your own preset.
+
+![Built-in presets](docs/presets.png)
+
+Every Windows cursor state gets a matching icon in your style. Each state can also be switched to the main pointer
+or any other shape.
+
+![Cursor states for several presets](docs/states.png)
+
 ## Build / install
 
 Needs the .NET 10 SDK, plus Visual Studio with the **Desktop development with C++** workload (for the NativeAOT agent).
@@ -14,6 +28,9 @@ Needs the .NET 10 SDK, plus Visual Studio with the **Desktop development with C+
 ```
 
 Run `CursorForge.exe`. It starts the agent, registers autostart and opens the settings window.
+
+The preset and state images above are rendered by the real cursor renderer; regenerate them with
+`dotnet run --project tools/IconGen -- --readme docs`.
 
 ## How it works
 
