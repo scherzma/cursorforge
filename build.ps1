@@ -39,7 +39,7 @@ if (-not (Test-Path "$root\assets\app.ico")) {
 
 Stop-Agent $dist
 dotnet publish "$root\src\CursorForge.Agent" -c Release -o $dist --nologo
-if ($LASTEXITCODE) { throw 'Agent build failed (NativeAOT needs Visual Studio with the "Desktop development with C++" workload)' }
+if ($LASTEXITCODE) { throw 'Agent build failed (see errors above; NativeAOT also needs Visual Studio with the "Desktop development with C++" workload)' }
 dotnet publish "$root\src\CursorForge.App" -c Release -o $dist --nologo
 if ($LASTEXITCODE) { throw 'UI build failed' }
 Get-ChildItem $dist -Filter *.pdb | Remove-Item

@@ -43,7 +43,7 @@ internal static unsafe class SystemCursors
         try
         {
             var frames = Enumerable.Range(0, CursorRenderer.SpinnerFrames)
-                .Select(f => CursorRenderer.RenderRole(style, role, f)).ToList();
+                .Select(f => (IReadOnlyList<RenderedCursor>)[CursorRenderer.RenderRole(style, role, f)]).ToList();
             string path = Path.Combine(ConfigStore.Dir, "cache", role.ToString().ToLowerInvariant() + ".ani");
             CursorFile.WriteAni(path, frames, CursorRenderer.SpinnerJiffies);
             return path;

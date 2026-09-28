@@ -181,10 +181,9 @@ public partial class MainWindow : Window
         }
     }
 
-    void RefreshStates()
+    void RefreshStates(CursorStyle s)
     {
         _stateFrames.Clear();
-        var s = _cfg.Style;
         bool same = _cfg.StateCursors == StateCursorMode.Same;
         foreach (var (role, _) in StateNames)
         {
@@ -281,7 +280,17 @@ public partial class MainWindow : Window
     void RefreshVisuals()
     {
         var s = _cfg.Style;
-        SizeValue.Text = $"{s.Size} px";
+        // Windows shows scheme cursors on a fixed canvas (its pointer size); bigger would have to be scaled = blurry.
+        int baseSize = WindowsPointer.BaseSize();
+        int maxSharp = Math.Clamp(CursorRenderer.MaxSizeFor(s, baseSize), (int)SizeSlider.Minimum + 1, 96);
+        bool wasLoading = _loading;
+        _loading = true;
+        SizeSlider.Maximum = maxSharp;
+        SizeSlider.Value = Math.Min(s.Size, maxSharp);
+        _loading = wasLoading;
+        var shown = CursorRenderer.Effective(s, baseSize);
+        SizeLimitText.Text = $"Up to {maxSharp} px stays pixel-sharp at your Windows pointer size.";
+        SizeValue.Text = $"{shown.Size} px";
         OutlineValue.Text = s.OutlineWidth == 0 ? "off" : $"{s.OutlineWidth:0.#} px";
         GlowSizeValue.Text = $"{s.GlowRadius:0} px";
         GlowStrengthValue.Text = $"{s.GlowStrength * 100:0}%";
@@ -294,13 +303,13 @@ public partial class MainWindow : Window
         var preset = Presets.Find(_cfg.PresetId);
         PresetHint.Text = preset == null ? "Custom style" : $"Based on {preset.Name}";
 
-        var rc = CursorRenderer.Render(s);
+        var rc = CursorRenderer.Render(shown);
         var bmp = ToBitmap(rc);
         PreviewLight.Source = bmp;
         PreviewDark.Source = bmp;
         LogoImage.Source = ToBitmap(CursorRenderer.RenderIcon(s, (int)Math.Round(28 * _ppd)));
 
-        RefreshStates();
+        RefreshStates(shown);
 
         int iconPx = (int)Math.Round(24 * _ppd);
         foreach (var (shape, (_, icon)) in _shapeButtons)
@@ -346,7 +355,11 @@ public partial class MainWindow : Window
         // The tray menu / hotkeys may have changed the config while we were in the background.
         if (!_ready || _saveTimer.IsEnabled) return;
         var fresh = ConfigStore.Load();
-        if (ConfigStore.Serialize(fresh) == ConfigStore.Serialize(_cfg)) return;
+        if (ConfigStore.Serialize(fresh) == ConfigStore.Serialize(_cfg))
+        {
+            RefreshVisuals(); // the Windows pointer size may have changed while we were in the background
+            return;
+        }
         _cfg = fresh;
         LoadIntoControls();
         UpdateAgentStatus();
@@ -374,6 +387,12 @@ public partial class MainWindow : Window
     }
 
     void OnImportImage(object sender, RoutedEventArgs e) => ImportImage();
+
+    void OnOpenPointerSettings(object sender, RoutedEventArgs e)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:easeofaccess-mousepointer") { UseShellExecute = true })?.Dispose(); }
+        catch { }
+    }
 
     bool ImportImage()
     {

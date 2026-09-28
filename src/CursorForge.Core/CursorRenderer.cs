@@ -52,6 +52,61 @@ public static class CursorRenderer
             ? Render(style)
             : RenderCore(style, style.Size, style.Glow, style.Shadow, role, frame);
 
+    /// <summary>
+    /// Renders one frame for a Windows cursor scheme file: exactly canvas x canvas pixels. Windows shows the
+    /// frame whose size matches its pointer size 1:1, so <paramref name="baseSize"/> (the pointer size) is
+    /// where the style is drawn at its own pixel size; larger canvases (other monitor DPIs) scale it up.
+    /// Anything that doesn't fit is shrunk until it does.
+    /// </summary>
+    public static RenderedCursor RenderFrame(CursorStyle style, CursorRole role, int frame, int baseSize, int canvas)
+    {
+        float k = canvas / (float)baseSize;
+        var s = style.Clone();
+        s.OutlineWidth *= k;
+        s.GlowRadius *= k;
+        int size = Math.Max(4, (int)MathF.Round(style.Size * k));
+        RenderedCursor rc;
+        while (true)
+        {
+            s.Size = size;
+            rc = RenderRole(s, role, frame);
+            if (rc.Width <= canvas || size <= 4) break;
+            size = Math.Max(4, size - Math.Max(1, (rc.Width - canvas) / 2));
+        }
+        if (rc.Width == canvas && rc.Height == canvas) return rc;
+
+        var px = new byte[canvas * canvas * 4];
+        int cw = Math.Min(canvas, rc.Width), ch = Math.Min(canvas, rc.Height);
+        for (int y = 0; y < ch; y++) Buffer.BlockCopy(rc.Pixels, y * rc.Width * 4, px, y * canvas * 4, cw * 4);
+        return new RenderedCursor
+        {
+            Width = canvas, Height = canvas, Pixels = px,
+            HotX = Math.Min(rc.HotX, canvas - 1), HotY = Math.Min(rc.HotY, canvas - 1),
+        };
+    }
+
+    /// <summary>The style with its size capped to what fits the Windows pointer size (what actually shows on screen).</summary>
+    public static CursorStyle Effective(CursorStyle style, int baseSize)
+    {
+        var s = style.Clone();
+        s.Size = Math.Min(s.Size, MaxSizeFor(style, baseSize));
+        return s;
+    }
+
+    /// <summary>Largest pointer size that fits a canvas of the given size without shrinking.</summary>
+    public static int MaxSizeFor(CursorStyle style, int canvas)
+    {
+        var s = style.Clone();
+        int lo = 8, hi = 160;
+        while (lo < hi)
+        {
+            int mid = (lo + hi + 1) / 2;
+            s.Size = mid;
+            if (Render(s).Width <= canvas) lo = mid; else hi = mid - 1;
+        }
+        return lo;
+    }
+
     /// <summary>Renders a flat (no glow / shadow) version that fits and is centered in a px*px square.</summary>
     public static RenderedCursor RenderIcon(CursorStyle style, int px)
     {
@@ -126,10 +181,13 @@ public static class CursorRenderer
 
         float pad = MathF.Ceiling(ow + 1.5f + MathF.Max(glow ? gr * 1.6f : 0, shadow ? MathF.Max(sx, sy) + sb : 0));
         float half = g.CenterHotspot ? 0.5f : 0f; // put the centre of round shapes on a pixel centre
-        int w = (int)MathF.Ceiling(g.MaxX - g.MinX + 2 * pad + 2 * half);
+        // Pointers have a straight vertical left edge: land its outer (outline) edge exactly on a pixel
+        // boundary so it stays one crisp column instead of being smeared across two.
+        float snap = g.CenterHotspot ? 0f : (1f - (pad - ow) % 1f) % 1f;
+        int w = (int)MathF.Ceiling(g.MaxX - g.MinX + 2 * pad + 2 * half + snap);
         int h = (int)MathF.Ceiling(g.MaxY - g.MinY + 2 * pad + 2 * half);
         int dim = Math.Clamp(Math.Max(w, h), 1, MaxCanvas);
-        float ox = pad - g.MinX + half, oy = pad - g.MinY + half;
+        float ox = pad - g.MinX + half + snap, oy = pad - g.MinY + half;
 
         var px = new byte[dim * dim * 4];
         for (int y = 0; y < dim; y++)

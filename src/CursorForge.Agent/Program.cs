@@ -40,12 +40,13 @@ internal static unsafe class Program
         }
         if (exitRequest)
         {
+            // Not running: still undo our cursor scheme (used by the uninstaller).
+            SchemeCursors.Restore();
             mutex.ReleaseMutex();
             return 0;
         }
 
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-        AppDomain.CurrentDomain.UnhandledException += (_, _) => SystemCursors.Restore();
 
         _cfg = ConfigStore.Load();
         nint inst = GetModuleHandle(0);
@@ -84,7 +85,7 @@ internal static unsafe class Program
         if (_winEventHook != 0) UnhookWinEvent(_winEventHook);
         _overlay.Stop();
         _tray.Remove();
-        SystemCursors.Restore();
+        SchemeCursors.Restore();
         DestroyWindow(_hwnd);
         mutex.ReleaseMutex();
         return 0;
@@ -104,14 +105,30 @@ internal static unsafe class Program
 
     static RenderedCursor RenderSafe()
     {
-        try { return CursorRenderer.Render(_cfg.Style); }
+        // Same size as the scheme cursors, so the game overlay matches the desktop cursor.
+        try { return CursorRenderer.Render(CursorRenderer.Effective(_cfg.Style, WindowsPointer.BaseSize())); }
         catch { return CursorRenderer.Render(Presets.Default.Style); }
     }
 
     static void ApplyCursors(RenderedCursor? rc)
     {
-        SystemCursors.Restore();
-        if (rc != null) SystemCursors.Apply(_cfg, rc);
+        if (rc == null)
+        {
+            SchemeCursors.Restore();
+        }
+        else
+        {
+            try
+            {
+                SchemeCursors.Apply(_cfg);
+            }
+            catch
+            {
+                // Registry/file trouble: fall back to runtime cursors (work everywhere, but Windows may scale them).
+                SystemCursors.Restore();
+                SystemCursors.Apply(_cfg, rc);
+            }
+        }
         _overlay.SetSystemHandles(SystemCursors.KnownHandles());
         _lastApplyTick = Environment.TickCount64;
     }

@@ -136,6 +136,11 @@
                             </DockPanel>
                             <Slider x:Name="SizeSlider" Minimum="8" Maximum="96" SmallChange="1" LargeChange="4"
                                     IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="OnSliderChanged"/>
+                            <DockPanel Margin="0,4,0,0">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource BtnGhost}" Content="Windows pointer size…"
+                                        Padding="8,3" FontSize="12" Click="OnOpenPointerSettings"/>
+                                <TextBlock x:Name="SizeLimitText" Style="{StaticResource Hint}" VerticalAlignment="Center"/>
+                            </DockPanel>
 
                             <StackPanel x:Name="VectorOptions">
                                 <TextBlock Text="Fill" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/>

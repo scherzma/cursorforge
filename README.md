@@ -22,11 +22,19 @@ Run `CursorForge.exe`. It starts the agent, registers autostart and opens the se
 | `CursorForge.Agent.exe` | Native (NativeAOT) tray agent, starts with Windows | ~4 MB RAM, 0% CPU when idle |
 | `CursorForge.exe` | WPF settings UI | Runs only while its window is open |
 
-**System cursors (every app).** The agent renders your cursor and swaps it into Windows with `SetSystemCursor`.
-The GPU hardware cursor keeps drawing it, exactly like the stock arrow, so **latency is identical to Windows' own cursor**.
+**System cursors (every app).** The agent renders your cursor into real multi-resolution `.cur`/`.ani` files
+and points your cursor scheme (`HKCU\Control Panel\Cursors`) at them, the same way installed cursor themes work.
+Windows loads the frame that matches its pointer size and shows it **1:1 on the GPU hardware cursor**. That means
+pixel-sharp images and **latency identical to Windows' own cursor**. There are no input hooks, so mouse input is never touched.
+(Runtime-created cursors via `SetSystemCursor` get stretched by the Windows pointer-size factor with bilinear filtering,
+which is why CursorForge doesn't use them.) Because the scheme is written to the registry, your cursor is already there at logon.
 Each state gets a matching glyph in your style: link hand, I-beam, animated busy spinner, working, unavailable,
 precision, move, four resize arrows, alternate select, and help/pin/person.
-The agent re-applies after anything that makes Windows reload its cursors (Settings changes, unlock, resume, display changes).
+
+The largest *sharp* size is bounded by the Windows pointer size (Settings → Accessibility → Mouse pointer and touch → Size),
+because Windows draws scheme cursors on a canvas of exactly that size. The UI shows the limit and links to the setting.
+Your original scheme is backed up to `%APPDATA%\CursorForge\windows-cursors-backup.txt` and restored when the agent exits,
+is disabled, or on `CursorForge.Agent.exe --exit`.
 
 **Game overlay (opt-in, per app).** Some games set their own cursor image, which the system swap can't touch.
 For apps on the *Games & Apps* list, the agent shows your cursor in a click-through layered window.
@@ -53,7 +61,7 @@ their menus use the standard cursor, which the system swap already covers.
 
 - Settings: `%APPDATA%\CursorForge\config.json`
 - Imported image: `%APPDATA%\CursorForge\custom.cfimg`
-- Generated animated cursors: `%APPDATA%\CursorForge\cache\*.ani`
+- Generated cursor files: `%APPDATA%\CursorForge\cursors\<hash>\*.cur|*.ani`
 - Autostart: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\CursorForge`
 
 Exiting the agent (tray → Exit, or *Stop agent* in Settings) restores your normal Windows cursors immediately.
