@@ -33,6 +33,9 @@ public readonly record struct Rgba(float R, float G, float B, float A)
     }
 
     public static Rgba Parse(string? s) => TryParse(s, out var c) ? c : new Rgba(1, 1, 1, 1);
+
+    /// <summary>Near-black or near-white: representable in a monochrome cursor.</summary>
+    public bool IsBlackOrWhite => MathF.Max(R, MathF.Max(G, B)) <= 40 / 255f || MathF.Min(R, MathF.Min(G, B)) >= 215 / 255f;
 }
 
 /// <summary>

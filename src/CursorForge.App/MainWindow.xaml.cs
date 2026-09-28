@@ -467,6 +467,10 @@ public partial class MainWindow : Window
         PreviewLight.Source = ToBitmap(CursorRenderer.Render(shown.ForDisplay(darkBackground: false)));
         PreviewDark.Source = ToBitmap(CursorRenderer.Render(shown.ForDisplay(darkBackground: true)));
         InvertHint.Visibility = s.IsInverted ? Visibility.Visible : Visibility.Collapsed;
+        InvertHint.Text = s.InvertIsMonochrome
+            ? "Inverted: drawn by the display hardware, so it inverts over every window. Hard edges, no glow or shadow."
+            : "A coloured outline or hotspot dot needs a colour inverted cursor, which some GPU-accelerated windows (browsers, Electron apps) show as white. Use a black or white outline and dot for inversion that works everywhere.";
+        InvertHint.Foreground = (Brush)FindResource(s.InvertIsMonochrome ? "Muted" : "Warn");
         LogoImage.Source = ToBitmap(CursorRenderer.RenderIcon(s, (int)Math.Round(28 * _ppd)));
 
         RefreshStates(shown);

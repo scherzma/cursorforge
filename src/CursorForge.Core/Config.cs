@@ -64,6 +64,18 @@ public sealed class CursorStyle
     /// <summary>Inverted fill (XOR with the screen). Not for imported images.</summary>
     [JsonIgnore] public bool IsInverted => string.Equals(Fill, Invert, StringComparison.OrdinalIgnoreCase) && Shape != CursorShape.Custom;
 
+    /// <summary>
+    /// An inverted style whose solid parts (outline, hotspot dot) are black or white can be a classic monochrome
+    /// cursor, which every display driver draws in hardware - inversion then works over every window. Coloured
+    /// solid parts need a "masked colour" cursor, which many drivers can't draw in hardware; Windows then
+    /// composites it in software and can't invert over GPU-accelerated windows (it shows white there).
+    /// </summary>
+    [JsonIgnore]
+    public bool InvertIsMonochrome =>
+        IsInverted
+        && (OutlineWidth <= 0 || Rgba.Parse(Outline).A < 0.5f || Rgba.Parse(Outline).IsBlackOrWhite)
+        && (!HotspotDot || Rgba.Parse(HotspotDotColor).IsBlackOrWhite);
+
     public string GlyphFor(CursorRole role) =>
         StateGlyphs != null && StateGlyphs.TryGetValue(role.ToString(), out var g) ? g : GlyphDefault;
 

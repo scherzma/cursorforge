@@ -13,6 +13,7 @@ public static class CursorFile
     public static byte[] ToCur(IReadOnlyList<RenderedCursor> sizes)
     {
         var dibs = sizes.Select(ToDib).ToList();
+        var mono = sizes.Select(IsMonochrome).ToList();
         using var ms = new MemoryStream();
         using var bw = new BinaryWriter(ms);
         bw.Write((ushort)0);
@@ -24,7 +25,7 @@ public static class CursorFile
             var rc = sizes[i];
             bw.Write((byte)(rc.Width >= 256 ? 0 : rc.Width));
             bw.Write((byte)(rc.Height >= 256 ? 0 : rc.Height));
-            bw.Write((byte)0);
+            bw.Write((byte)(mono[i] ? 2 : 0)); // colour count
             bw.Write((byte)0);
             bw.Write((ushort)rc.HotX);
             bw.Write((ushort)rc.HotY);
@@ -84,9 +85,57 @@ public static class CursorFile
         File.Move(tmp, path, overwrite: true);
     }
 
+    /// <summary>
+    /// An inverted cursor whose every pixel is transparent, inverting, black or white fits the classic 1-bpp
+    /// AND/XOR format, which display hardware draws itself (see <see cref="CursorStyle.InvertIsMonochrome"/>).
+    /// </summary>
+    public static bool IsMonochrome(RenderedCursor rc)
+    {
+        if (rc.Mask == null) return false;
+        for (int i = 0, n = rc.Width * rc.Height; i < n; i++)
+        {
+            int p = i * 4;
+            bool black = rc.Pixels[p] <= 40 && rc.Pixels[p + 1] <= 40 && rc.Pixels[p + 2] <= 40;
+            bool white = rc.Pixels[p] >= 215 && rc.Pixels[p + 1] >= 215 && rc.Pixels[p + 2] >= 215;
+            if (!black && !white) return false;
+        }
+        return true;
+    }
+
+    /// <summary>1-bpp payload: header, 2-colour table, XOR bitmap then AND mask (both bottom-up).</summary>
+    static byte[] ToMonochromeDib(RenderedCursor rc)
+    {
+        int w = rc.Width, h = rc.Height, stride = (w + 31) / 32 * 4;
+        var xor = new byte[stride * h];
+        var and = new byte[stride * h];
+        for (int y = 0; y < h; y++)
+        {
+            int row = (h - 1 - y) * stride;
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                byte bit = (byte)(0x80 >> (x & 7));
+                if (rc.Pixels[i * 4] >= 128) xor[row + (x >> 3)] |= bit;    // white / invert
+                if (rc.Mask![i] != 0) and[row + (x >> 3)] |= bit;          // keep (and possibly invert) the screen
+            }
+        }
+        using var ms = new MemoryStream();
+        using var bw = new BinaryWriter(ms);
+        bw.Write(40); bw.Write(w); bw.Write(h * 2);
+        bw.Write((ushort)1); bw.Write((ushort)1);
+        bw.Write(0); bw.Write(xor.Length + and.Length);
+        bw.Write(0); bw.Write(0); bw.Write(2); bw.Write(0);
+        bw.Write(0x00000000); // palette: black
+        bw.Write(0x00FFFFFF); //          white
+        bw.Write(xor);
+        bw.Write(and);
+        return ms.ToArray();
+    }
+
     /// <summary>32-bit BMP-in-ICO payload: header with doubled height, bottom-up BGRA, empty AND mask.</summary>
     static byte[] ToDib(RenderedCursor rc)
     {
+        if (IsMonochrome(rc)) return ToMonochromeDib(rc);
         int w = rc.Width, h = rc.Height, maskStride = (w + 31) / 32 * 4;
         using var ms = new MemoryStream();
         using var bw = new BinaryWriter(ms);
