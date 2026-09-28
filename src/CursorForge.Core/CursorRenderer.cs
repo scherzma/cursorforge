@@ -221,14 +221,17 @@ public static class CursorRenderer
 
         float pad = MathF.Ceiling(ow + 1.5f + MathF.Max(glow ? gr * 1.6f : 0, shadow ? MathF.Max(sx, sy) + sb : 0));
         if (s.HotspotDot) pad = MathF.Max(pad, MathF.Ceiling(s.HotspotDotSize / 2f + 1)); // room for a dot on the tip
-        float half = g.CenterHotspot ? 0.5f : 0f; // put the centre of round shapes on a pixel centre
-        // Pointers have a straight vertical left edge: land its outer (outline) edge exactly on a pixel
-        // boundary so it stays one crisp column instead of being smeared across two.
-        float snap = g.CenterHotspot ? 0f : (1f - (pad - ow) % 1f) % 1f;
-        int w = (int)MathF.Ceiling(g.MaxX - g.MinX + 2 * pad + 2 * half + snap);
-        int h = (int)MathF.Ceiling(g.MaxY - g.MinY + 2 * pad + 2 * half);
+        // Symmetric shapes put their axis (x = 0, and y = 0 for round ones) on a pixel *centre*, so the two
+        // halves rasterize as exact mirror images around the hotspot pixel.
+        bool midX = g.CenterHotspot || g.MirrorX, midY = g.CenterHotspot;
+        // Tilted pointers have a straight vertical left edge instead: land its outer (outline) edge exactly on a
+        // pixel boundary so it stays one crisp column instead of being smeared across two.
+        float snap = midX ? 0f : (1f - (pad - ow) % 1f) % 1f;
+        float ox = midX ? MathF.Ceiling(pad - g.MinX) + 0.5f : pad - g.MinX + snap;
+        float oy = midY ? MathF.Ceiling(pad - g.MinY) + 0.5f : pad - g.MinY;
+        int w = (int)MathF.Ceiling(ox + g.MaxX + pad);
+        int h = (int)MathF.Ceiling(oy + g.MaxY + pad);
         int dim = Math.Clamp(Math.Max(w, h), 1, MaxCanvas);
-        float ox = pad - g.MinX + half + snap, oy = pad - g.MinY + half;
 
         var px = new byte[dim * dim * 4];
         for (int y = 0; y < dim; y++)
@@ -272,8 +275,13 @@ public static class CursorRenderer
             }
         }
 
-        int hx = Math.Clamp((int)MathF.Floor(g.HotX + ox), 0, dim - 1);
-        int hy = Math.Clamp((int)MathF.Floor(g.HotY + oy), 0, dim - 1);
+        // Pointer tips: the rounded corner plus the outline reach past the geometric vertex, so move the hotspot
+        // out along the tip direction to the outermost solidly covered pixel (like Windows' own arrow, whose
+        // hotspot is its very first visible tip pixel).
+        float reach = MathF.Max(0, g.TipExtra + ow - 0.5f);
+        float hotX = g.HotX + g.TipDirX * reach, hotY = g.HotY + g.TipDirY * reach;
+        int hx = Math.Clamp((int)MathF.Floor(hotX + ox), 0, dim - 1);
+        int hy = Math.Clamp((int)MathF.Floor(hotY + oy), 0, dim - 1);
         return new RenderedCursor { Width = dim, Height = dim, HotX = hx, HotY = hy, Pixels = px };
     }
 
@@ -356,6 +364,10 @@ public static class CursorRenderer
     {
         public float MinX, MinY, MaxX, MaxY, HotX, HotY;
         public bool CenterHotspot;
+        /// <summary>Mirror-symmetric around x = 0 (but not y): keep that axis on a pixel centre.</summary>
+        public bool MirrorX;
+        /// <summary>For pointed shapes: outward direction of the tip, and how far the rounded corner reaches past it.</summary>
+        public float TipDirX, TipDirY, TipExtra;
         public Func<float, float, float> Sdf = null!;
         public Func<float, float, float>? Accent;
 
@@ -401,6 +413,13 @@ public static class CursorRenderer
             float r = size / 2f;
             switch (shape)
             {
+                case CursorShape.Triangle:
+                {
+                    // Upright, mirror-symmetric; the hotspot is the apex.
+                    var g = Polygon([0, 0, 6.5f, 17.5f, -6.5f, 17.5f], 17.5f, size, 0.8f);
+                    g.MirrorX = true;
+                    return g;
+                }
                 case CursorShape.Pointer:
                     return Polygon([0, 0, 0, 17.5f, 4.9f, 13.2f, 12.6f, 12.6f], 17.5f, size, 0.9f);
                 case CursorShape.Arrowhead:
@@ -461,10 +480,12 @@ public static class CursorRenderer
                 minX = MathF.Min(minX, v[i].X); maxX = MathF.Max(maxX, v[i].X);
                 minY = MathF.Min(minY, v[i].Y); maxY = MathF.Max(maxY, v[i].Y);
             }
+            var inward = Vector2.Normalize(Vector2.Normalize(v[^1] - v[0]) + Vector2.Normalize(v[1] - v[0]));
             return new Geometry
             {
                 MinX = minX - rr, MinY = minY - rr, MaxX = maxX + rr, MaxY = maxY + rr,
-                HotX = 0, HotY = 0,
+                HotX = v[0].X, HotY = v[0].Y,
+                TipDirX = -inward.X, TipDirY = -inward.Y, TipExtra = rr,
                 Sdf = (x, y) => SdPolygon(v, new Vector2(x, y)) - rr,
             };
         }
@@ -477,7 +498,8 @@ public static class CursorRenderer
             float u = size * 1.05f;
             return new Geometry
             {
-                MinX = -0.27f * u, MinY = 0, MaxX = 0.5f * u, MaxY = 0.95f * u, HotX = 0, HotY = 0.01f * u,
+                MinX = -0.27f * u, MinY = 0, MaxX = 0.5f * u, MaxY = 0.95f * u, HotX = 0, HotY = 0.005f * u,
+                TipDirX = 0, TipDirY = -1, TipExtra = 0, MirrorX = false,
                 Sdf = (x, y) =>
                 {
                     x /= u; y /= u;
@@ -540,6 +562,10 @@ public static class CursorRenderer
                 0, len * 0.02f);
             g.HotY = -r;
             g.CenterHotspot = false;
+            g.MirrorX = true;
+            g.TipDirX = 0;
+            g.TipDirY = -1;
+            g.TipExtra = len * 0.02f;
             return g;
         }
 
@@ -554,7 +580,8 @@ public static class CursorRenderer
             {
                 MinX = MathF.Min(main.MinX, cx - br), MinY = MathF.Min(main.MinY, cy - br),
                 MaxX = MathF.Max(main.MaxX, cx + br), MaxY = MathF.Max(main.MaxY, cy + br),
-                HotX = main.HotX, HotY = main.HotY, CenterHotspot = main.CenterHotspot,
+                HotX = main.HotX, HotY = main.HotY, CenterHotspot = main.CenterHotspot, MirrorX = main.MirrorX,
+                TipDirX = main.TipDirX, TipDirY = main.TipDirY, TipExtra = main.TipExtra,
                 Sdf = (x, y) => MathF.Min(inner(x, y), badge(x - cx, y - cy, br)),
                 Accent = main.Accent,
             };

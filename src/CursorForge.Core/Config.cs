@@ -1,8 +1,8 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace CursorForge;
 
-public enum CursorShape { Arrow, Pointer, Arrowhead, Ring, Dot, Target, Cross, Diamond, Halo, Custom }
+public enum CursorShape { Arrow, Pointer, Arrowhead, Triangle, Ring, Dot, Target, Cross, Diamond, Halo, Custom }
 
 /// <summary>The Windows cursor states CursorForge can draw a matching cursor for.</summary>
 public enum CursorRole

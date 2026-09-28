@@ -40,6 +40,10 @@ public static class Presets
         {
             Shape = CursorShape.Arrow, Size = 44, Fill = "#55FFFFFF", Outline = "#E6FFFFFF", OutlineWidth = 1.5f, Shadow = true,
         }),
+        new("spire", "Spire", new CursorStyle
+        {
+            Shape = CursorShape.Triangle, Size = 34, Fill = "#FFFFFFFF", Outline = "#FF0A0A0A", OutlineWidth = 2f, Shadow = true,
+        }),
         new("ring", "Yolo Ring", new CursorStyle
         {
             Shape = CursorShape.Ring, Size = 40, Fill = "#FFFFD60A", Outline = "#FF000000", OutlineWidth = 1.5f, Shadow = true,
