@@ -1,0 +1,304 @@
+<Window x:Class="CursorForge.Ui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CursorForge.Ui"
+        Title="CursorForge" Width="1100" Height="760" MinWidth="940" MinHeight="600"
+        Background="{StaticResource Bg}" Foreground="{StaticResource Text}"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13"
+        WindowStartupLocation="CenterScreen" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <Grid Margin="28,18,28,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel LastChildFill="False">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Width="46" Height="46" CornerRadius="13" BorderBrush="{StaticResource Stroke}" BorderThickness="1">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#2B2550" Offset="0"/>
+                            <GradientStop Color="#171A22" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Image x:Name="LogoImage" Width="28" Height="28" Stretch="Uniform"/>
+                </Border>
+                <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="CursorForge" FontSize="21" FontWeight="SemiBold" FontFamily="Segoe UI Variable Display, Segoe UI"/>
+                    <TextBlock Text="Custom cursors · zero added latency" Foreground="{StaticResource Muted}" Margin="0,1,0,0"/>
+                </StackPanel>
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Style="{StaticResource Pill}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="{StaticResource Good}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="StatusText" Text="Active" Margin="8,0,0,0" Foreground="{StaticResource Muted}" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+                <CheckBox x:Name="EnabledSwitch" Style="{StaticResource Switch}" Content="Enabled" Margin="20,0,0,0"
+                          VerticalAlignment="Center" Click="OnEnabledClick"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Tabs -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,20,0,16">
+            <RadioButton x:Name="TabCursor" Style="{StaticResource Tab}" GroupName="tabs" Content="Cursor" IsChecked="True" Checked="OnTabChanged"/>
+            <RadioButton x:Name="TabApps" Style="{StaticResource Tab}" GroupName="tabs" Content="Games &amp; Apps" Checked="OnTabChanged"/>
+            <RadioButton x:Name="TabSettings" Style="{StaticResource Tab}" GroupName="tabs" Content="Settings" Checked="OnTabChanged"/>
+        </StackPanel>
+
+        <!-- ============ Cursor page ============ -->
+        <Grid x:Name="PageCursor" Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="18"/>
+                <ColumnDefinition Width="410"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource Card}" Padding="20,18,8,8">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,12,0">
+                        <TextBlock x:Name="PresetHint" DockPanel.Dock="Right" Style="{StaticResource Hint}" VerticalAlignment="Center"/>
+                        <TextBlock Text="Presets" Style="{StaticResource CardTitle}"/>
+                    </DockPanel>
+                    <ScrollViewer x:Name="PresetScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,14,0,0">
+                        <WrapPanel x:Name="PresetPanel"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <ScrollViewer x:Name="SideScroll" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,4,0">
+                    <!-- Preview -->
+                    <Grid Height="200">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="#E6E9EF" CornerRadius="16,0,0,16" ClipToBounds="True">
+                            <Image x:Name="PreviewLight" Stretch="Uniform" StretchDirection="DownOnly"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <Border Grid.Column="1" Background="#060709" CornerRadius="0,16,16,0" ClipToBounds="True"
+                                BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,1,1">
+                            <Image x:Name="PreviewDark" Stretch="Uniform" StretchDirection="DownOnly"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <Border Grid.ColumnSpan="2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
+                                Padding="8,3" CornerRadius="7" Background="#B3101216">
+                            <TextBlock Text="Actual size" FontSize="11" Foreground="White"/>
+                        </Border>
+                    </Grid>
+
+                    <!-- State cursors -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <RadioButton x:Name="StatesMatching" Style="{StaticResource Seg}" GroupName="states" Content="Matching set" Click="OnStatesClick"/>
+                                    <RadioButton x:Name="StatesSame" Style="{StaticResource Seg}" GroupName="states" Content="Same" Margin="0" Click="OnStatesClick"/>
+                                </StackPanel>
+                                <TextBlock Text="Cursor states" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <WrapPanel x:Name="StatesPanel" Margin="0,14,0,0"/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0"
+                                       Text="Link, text, busy, resize and the rest are drawn to match your pointer. Choose which states to replace under Settings."/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Customize -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Customize" Style="{StaticResource CardTitle}"/>
+
+                            <TextBlock Text="Shape" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/>
+                            <WrapPanel x:Name="ShapePanel"/>
+
+                            <StackPanel x:Name="CustomPanel" Visibility="Collapsed" Margin="0,6,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Import image…" Style="{StaticResource Btn}" Click="OnImportImage"/>
+                                    <TextBlock Text="Hotspot" VerticalAlignment="Center" Margin="16,0,8,0" Foreground="{StaticResource Muted}"/>
+                                    <RadioButton x:Name="HotTopLeft" Style="{StaticResource Seg}" GroupName="hot" Content="Top-left" Click="OnHotspotClick"/>
+                                    <RadioButton x:Name="HotCenter" Style="{StaticResource Seg}" GroupName="hot" Content="Center" Click="OnHotspotClick"/>
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                           Text="PNG, ICO, CUR, JPG, BMP or GIF. Transparent PNGs work best; the hotspot is the pixel that clicks."/>
+                            </StackPanel>
+
+                            <DockPanel Margin="0,18,0,0">
+                                <TextBlock x:Name="SizeValue" DockPanel.Dock="Right" Style="{StaticResource ValueText}"/>
+                                <TextBlock Text="Size" Style="{StaticResource FieldLabel}"/>
+                            </DockPanel>
+                            <Slider x:Name="SizeSlider" Minimum="8" Maximum="96" SmallChange="1" LargeChange="4"
+                                    IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="OnSliderChanged"/>
+
+                            <StackPanel x:Name="VectorOptions">
+                                <TextBlock Text="Fill" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/>
+                                <ContentControl x:Name="FillHost" Focusable="False"/>
+
+                                <DockPanel Margin="0,18,0,8">
+                                    <TextBlock x:Name="OutlineValue" DockPanel.Dock="Right" Style="{StaticResource ValueText}"/>
+                                    <TextBlock Text="Outline" Style="{StaticResource FieldLabel}"/>
+                                </DockPanel>
+                                <ContentControl x:Name="OutlineHost" Focusable="False"/>
+                                <Slider x:Name="OutlineSlider" Minimum="0" Maximum="6" TickFrequency="0.5" IsSnapToTickEnabled="True"
+                                        SmallChange="0.5" LargeChange="1" ValueChanged="OnSliderChanged" Margin="0,10,0,0"/>
+
+                                <CheckBox x:Name="GlowSwitch" Style="{StaticResource Switch}" Content="Glow" Margin="0,20,0,0" Click="OnControlClick"/>
+                                <StackPanel x:Name="GlowPanel" Margin="0,10,0,0">
+                                    <ContentControl x:Name="GlowHost" Focusable="False"/>
+                                    <DockPanel Margin="0,12,0,0">
+                                        <TextBlock x:Name="GlowSizeValue" DockPanel.Dock="Right" Style="{StaticResource ValueText}"/>
+                                        <TextBlock Text="Glow size" Style="{StaticResource FieldLabel}"/>
+                                    </DockPanel>
+                                    <Slider x:Name="GlowSizeSlider" Minimum="2" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True"
+                                            ValueChanged="OnSliderChanged"/>
+                                    <DockPanel Margin="0,10,0,0">
+                                        <TextBlock x:Name="GlowStrengthValue" DockPanel.Dock="Right" Style="{StaticResource ValueText}"/>
+                                        <TextBlock Text="Glow intensity" Style="{StaticResource FieldLabel}"/>
+                                    </DockPanel>
+                                    <Slider x:Name="GlowStrengthSlider" Minimum="10" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                            ValueChanged="OnSliderChanged"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="ShadowSwitch" Style="{StaticResource Switch}" Content="Drop shadow" Margin="0,20,0,0" Click="OnControlClick"/>
+                            </StackPanel>
+
+                            <DockPanel Margin="0,20,0,0">
+                                <TextBlock x:Name="OpacityValue" DockPanel.Dock="Right" Style="{StaticResource ValueText}"/>
+                                <TextBlock Text="Opacity" Style="{StaticResource FieldLabel}"/>
+                            </DockPanel>
+                            <Slider x:Name="OpacitySlider" Minimum="20" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                                    ValueChanged="OnSliderChanged"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ============ Games & Apps page ============ -->
+        <ScrollViewer x:Name="PageApps" Grid.Row="2" Visibility="Collapsed"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel MaxWidth="860" HorizontalAlignment="Left" Margin="0,0,4,0">
+                <Border Style="{StaticResource Card}">
+                    <DockPanel>
+                        <CheckBox x:Name="OverlaySwitch" DockPanel.Dock="Right" Style="{StaticResource Switch}"
+                                  VerticalAlignment="Top" Click="OnControlClick"/>
+                        <StackPanel Margin="0,0,24,0">
+                            <TextBlock Text="Game overlay" Style="{StaticResource CardTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" FontSize="12.5" LineHeight="20"
+                                       Text="Most apps use the standard Windows cursors. CursorForge replaces those directly, so they work everywhere with zero added latency and no setup. Some games draw their own cursor instead. For the apps listed below, CursorForge draws your cursor in a small click-through overlay whenever the game shows a cursor, and hides it as soon as the game hides it (for example while you aim in a shooter)."/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0" FontSize="12.5" LineHeight="20"
+                                       Text="No DLL injection, no input hooks, no reading game memory, no handles to the game process. The overlay is an ordinary window that follows the global cursor position."/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Overlay apps" Style="{StaticResource CardTitle}"/>
+                        <Grid Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="AddAppBox" Tag="game.exe" KeyDown="OnAddAppKey"/>
+                            <Button Grid.Column="1" Content="Add" Style="{StaticResource BtnPrimary}" Margin="8,0,0,0" Padding="18,8" Click="OnAddApp"/>
+                            <Button Grid.Column="2" Content="Pick running app…" Style="{StaticResource Btn}" Margin="8,0,0,0" Click="OnPickApp"/>
+                        </Grid>
+                        <StackPanel x:Name="AppsList" Margin="0,14,0,0"/>
+                        <TextBlock x:Name="AppsEmpty" Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                   Text="No apps yet. Add one here, or press the overlay hotkey while the game is focused."/>
+                        <Border Background="{StaticResource Surface2}" CornerRadius="10" Padding="14,12" Margin="0,16,0,0">
+                            <TextBlock Style="{StaticResource Hint}">
+                                <Run Text="Auto" FontWeight="SemiBold" Foreground="{StaticResource Text}"/><Run Text=" shows the overlay only while the game shows its own OS cursor. Recommended; safe for shooters."/>
+                                <LineBreak/>
+                                <Run Text="Always" FontWeight="SemiBold" Foreground="{StaticResource Text}"/><Run Text=" also shows it when the game hides the OS cursor and draws a software cursor (some RTS and MMO games). It still hides while the cursor is locked for mouse-look."/>
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ============ Settings page ============ -->
+        <ScrollViewer x:Name="PageSettings" Grid.Row="2" Visibility="Collapsed"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="0,0,4,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="General" Style="{StaticResource CardTitle}"/>
+                            <CheckBox x:Name="AutostartSwitch" Style="{StaticResource Switch}" Content="Start with Windows"
+                                      Margin="0,16,0,0" Click="OnAutostartClick"/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                       Text="Only the tiny background agent starts at sign-in. This window stays closed."/>
+
+                            <TextBlock Text="Turn cursor on / off" Style="{StaticResource FieldLabel}" Margin="0,20,0,8"/>
+                            <local:HotkeyBox x:Name="ToggleHotkeyBox"/>
+                            <TextBlock Text="Add / remove the focused game from the overlay list" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/>
+                            <local:HotkeyBox x:Name="OverlayHotkeyBox"/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                       Text="Click a box, then press a key combination. Backspace turns the hotkey off."/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Background agent" Style="{StaticResource CardTitle}"/>
+                            <TextBlock x:Name="AgentInfo" Style="{StaticResource Hint}" Margin="0,10,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                <Button x:Name="AgentStartStop" Style="{StaticResource Btn}" Content="Stop agent" Click="OnAgentStartStop"/>
+                                <Button Style="{StaticResource Btn}" Content="Restart" Margin="8,0,0,0" Click="OnAgentRestart"/>
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0"
+                                       Text="Stopping the agent restores your normal Windows cursors right away."/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Replace these Windows cursors" Style="{StaticResource CardTitle}"/>
+                            <CheckBox x:Name="RoleArrow" Style="{StaticResource Switch}" Content="Normal pointer" Margin="0,16,0,0" Click="OnControlClick"/>
+                            <CheckBox x:Name="RoleHand" Style="{StaticResource Switch}" Content="Link select (hand)" Margin="0,14,0,0" Click="OnControlClick"/>
+                            <CheckBox x:Name="RoleBusy" Style="{StaticResource Switch}" Content="Busy / working in background" Margin="0,14,0,0" Click="OnControlClick"/>
+                            <CheckBox x:Name="RoleText" Style="{StaticResource Switch}" Content="Text select (I-beam)" Margin="0,14,0,0" Click="OnControlClick"/>
+                            <CheckBox x:Name="RoleResize" Style="{StaticResource Switch}" Content="Resize and move" Margin="0,14,0,0" Click="OnControlClick"/>
+                            <CheckBox x:Name="RoleOther" Style="{StaticResource Switch}" Content="Precision, unavailable, help, pin, person" Margin="0,14,0,0" Click="OnControlClick"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Why it's fast" Style="{StaticResource CardTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" FontSize="12.5" LineHeight="20">
+                                <Run Text="•  Standard cursors are swapped inside Windows itself, and the GPU hardware cursor keeps drawing them. Latency is identical to the stock Windows cursor."/>
+                                <LineBreak/>
+                                <Run Text="•  The agent is a native ~3 MB program. It sleeps in its message loop and uses 0% CPU when idle."/>
+                                <LineBreak/>
+                                <Run Text="•  The overlay thread only wakes while an overlay game is focused, and it disappears while the game hides the cursor. Games that aim with a hidden cursor keep their normal fullscreen presentation path."/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <TextBlock Grid.Row="3" Style="{StaticResource Hint}" Margin="2,14,0,0"
+                   Text="Changes apply instantly. Closing this window keeps CursorForge running in the tray."/>
+    </Grid>
+</Window>
