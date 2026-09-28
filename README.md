@@ -33,6 +33,7 @@ Needs the .NET 10 SDK, plus Visual Studio with the **Desktop development with C+
 ```powershell
 .\build.ps1             # builds into .\dist
 .\build.ps1 -Install    # also installs to %LOCALAPPDATA%\Programs\CursorForge + Start-menu shortcut
+.\build.ps1 -Release    # also builds the single-file download: .\release\CursorForge.exe
 .\build.ps1 -Uninstall  # stops the agent, removes autostart/shortcut/files (keeps settings)
 ```
 
