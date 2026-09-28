@@ -5,6 +5,15 @@ It has a full matching set of state cursors and an anti-cheat-friendly overlay f
 
 ![CursorForge settings window](docs/app.png)
 
+## Download
+
+Get **`CursorForge.exe`** from the [latest release](../../releases/latest) and run it. It's a single self-contained file
+for Windows 10/11 x64 (no .NET install needed). On first start it offers to install itself for your account
+(no admin rights): `%LOCALAPPDATA%\Programs\CursorForge`, a Start-menu shortcut, autostart and an entry in
+**Settings → Apps** to uninstall it again. Choose *No* to run it portable from its current folder instead.
+
+The exe isn't code-signed, so Windows SmartScreen may warn on the first start: click **More info → Run anyway**.
+
 ## Presets
 
 15 built-in looks to start from. Tweak shape, size, colours, outline, glow, shadow and opacity, or import your own
