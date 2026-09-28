@@ -38,6 +38,13 @@ Windows scales *other* apps' own cursors by the same factor, just as if you had 
 Your original scheme is backed up to `%APPDATA%\CursorForge\windows-cursors-backup.txt` and restored when the agent exits,
 is disabled, or on `CursorForge.Agent.exe --exit`.
 
+**Click flash (optional).** While a mouse button is held, the cursor switches to pre-rendered copies in your
+left/right click colours. They're loaded from the same multi-resolution files with `LR_DEFAULTSIZE`, so they're just as sharp.
+Button state is polled (`GetAsyncKeyState`) every 8 ms while the mouse is in use and every 100 ms when idle.
+Raw Input or a hook would wake the agent for every movement report (up to 8000/s on gaming mice), while polling
+costs the same tiny amount at any mouse rate. Nothing is hooked, so input latency is untouched. The flash only
+happens while the pointer shows one of CursorForge's cursors, so games with their own cursor never pay for it.
+
 **Game overlay (opt-in, per app).** Some games set their own cursor image, which the system swap can't touch.
 For apps on the *Games & Apps* list, the agent shows your cursor in a click-through layered window.
 It is visible only while the game shows a cursor, and hidden when the cursor is hidden or locked (e.g. aiming in a shooter).

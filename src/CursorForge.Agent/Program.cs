@@ -19,6 +19,7 @@ internal static unsafe class Program
     static nint _hwnd, _winEventHook;
     static Overlay _overlay = null!;
     static Tray _tray = null!;
+    static ClickFlasher _flasher = null!;
     static uint _taskbarCreated;
     static long _lastApplyTick;
     static int _trayRetries;
@@ -69,6 +70,8 @@ internal static unsafe class Program
         _overlay = new Overlay();
         _overlay.Start();
         _tray = new Tray(_hwnd);
+        _flasher = new ClickFlasher();
+        _flasher.Start();
         _winEventHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, 0, &OnWinEvent, 0, 0,
             WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
 
@@ -84,6 +87,7 @@ internal static unsafe class Program
 
         if (_winEventHook != 0) UnhookWinEvent(_winEventHook);
         _overlay.Stop();
+        _flasher.Stop();
         _tray.Remove();
         SchemeCursors.Restore();
         DestroyWindow(_hwnd);
@@ -129,7 +133,10 @@ internal static unsafe class Program
                 SystemCursors.Apply(_cfg, rc);
             }
         }
-        _overlay.SetSystemHandles(SystemCursors.KnownHandles());
+        var known = SystemCursors.KnownHandles();
+        _overlay.SetSystemHandles(known);
+        _flasher.Configure(rc != null && _cfg.ClickFlash.Enabled ? SchemeCursors.CurrentDir : null,
+            CursorRoles.Selected(_cfg), known, _cfg.ClickFlash.DurationMs);
         _lastApplyTick = Environment.TickCount64;
     }
 

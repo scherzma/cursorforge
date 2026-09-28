@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     double _ppd = 1;
     readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
     readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(2) };
-    readonly ColorRow _fill = new(), _outline = new(), _glow = new();
+    readonly ColorRow _fill = new(), _outline = new(), _glow = new(), _flashLeft = new(), _flashRight = new();
     readonly List<(RadioButton Button, Preset Preset)> _presetButtons = [];
     readonly Dictionary<CursorShape, (RadioButton Button, Image? Icon)> _shapeButtons = [];
     readonly Dictionary<CursorRole, Image> _stateImages = [];
@@ -40,6 +40,10 @@ public partial class MainWindow : Window
         FillHost.Content = _fill;
         OutlineHost.Content = _outline;
         GlowHost.Content = _glow;
+        FlashLeftHost.Content = _flashLeft;
+        FlashRightHost.Content = _flashRight;
+        _flashLeft.Changed += OnInput;
+        _flashRight.Changed += OnInput;
         _fill.Changed += OnInput;
         _outline.Changed += OnInput;
         _glow.Changed += OnInput;
@@ -223,6 +227,10 @@ public partial class MainWindow : Window
             _fill.Value = s.Fill;
             _outline.Value = s.Outline;
             _glow.Value = s.GlowColor;
+            FlashSwitch.IsChecked = _cfg.ClickFlash.Enabled;
+            _flashLeft.Value = _cfg.ClickFlash.LeftColor;
+            _flashRight.Value = _cfg.ClickFlash.RightColor;
+            FlashDurationSlider.Value = _cfg.ClickFlash.DurationMs;
             bool topLeft = s.CustomHotX < 0.25f && s.CustomHotY < 0.25f;
             HotTopLeft.IsChecked = topLeft;
             HotCenter.IsChecked = !topLeft;
@@ -264,6 +272,10 @@ public partial class MainWindow : Window
         s.Fill = _fill.Value;
         s.Outline = _outline.Value;
         s.GlowColor = _glow.Value;
+        _cfg.ClickFlash.Enabled = FlashSwitch.IsChecked == true;
+        _cfg.ClickFlash.LeftColor = _flashLeft.Value;
+        _cfg.ClickFlash.RightColor = _flashRight.Value;
+        _cfg.ClickFlash.DurationMs = (int)FlashDurationSlider.Value;
 
         _cfg.OverlayEnabled = OverlaySwitch.IsChecked == true;
         _cfg.ReplaceArrow = RoleArrow.IsChecked == true;
@@ -314,6 +326,12 @@ public partial class MainWindow : Window
         LogoImage.Source = ToBitmap(CursorRenderer.RenderIcon(s, (int)Math.Round(28 * _ppd)));
 
         RefreshStates(shown);
+
+        FlashPanel.Visibility = _cfg.ClickFlash.Enabled ? Visibility.Visible : Visibility.Collapsed;
+        FlashDurationValue.Text = $"{_cfg.ClickFlash.DurationMs} ms";
+        int flashPx = (int)Math.Round(28 * _ppd);
+        FlashLeftPreview.Source = ToBitmap(CursorRenderer.RenderIcon(_cfg.ClickFlash.Apply(shown, right: false), flashPx));
+        FlashRightPreview.Source = ToBitmap(CursorRenderer.RenderIcon(_cfg.ClickFlash.Apply(shown, right: true), flashPx));
 
         int iconPx = (int)Math.Round(24 * _ppd);
         foreach (var (shape, (_, icon)) in _shapeButtons)

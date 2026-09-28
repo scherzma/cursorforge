@@ -29,6 +29,12 @@ internal static class SchemeCursors
     ];
 
     static string CursorsDir => Path.Combine(ConfigStore.Dir, "cursors");
+
+    /// <summary>Folder of the currently applied cursor files (null when not applied).</summary>
+    public static string? CurrentDir { get; private set; }
+
+    public static string FlashPath(string dir, CursorRole role, bool right) =>
+        FilePath(Path.Combine(dir, right ? "flash-right" : "flash-left"), role);
     static string BackupPath => Path.Combine(ConfigStore.Dir, "windows-cursors-backup.txt");
 
     public static void Apply(AppConfig cfg)
@@ -38,7 +44,12 @@ internal static class SchemeCursors
         int baseSize = WindowsPointer.CanvasFor(cfg.Style, WindowsPointer.BaseSize());
         var selected = CursorRoles.Selected(cfg).Select(r => r.Role).ToHashSet();
         string dir = Path.Combine(CursorsDir, Fingerprint(cfg, baseSize));
-        if (!File.Exists(Path.Combine(dir, "complete"))) Generate(cfg, baseSize, dir);
+        if (!File.Exists(Path.Combine(dir, "complete")))
+        {
+            Generate(cfg, baseSize, dir);
+            // Rendering all frames churns through a few MB; hand it back to Windows instead of keeping it idle.
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        }
 
         var backup = UpdateBackup();
         using (var key = Registry.CurrentUser.CreateSubKey(KeyPath, writable: true))
@@ -51,12 +62,14 @@ internal static class SchemeCursors
         }
         SystemParametersInfo(SPI_SETCURSORBASESIZE, 0, baseSize, 0);
         SystemParametersInfo(SPI_SETCURSORS, 0, 0, 0);
+        CurrentDir = dir;
         DeleteStale(dir);
     }
 
     /// <summary>Puts the user's previous cursor scheme back.</summary>
     public static void Restore()
     {
+        CurrentDir = null;
         try
         {
             var backup = ReadBackup();
@@ -99,6 +112,20 @@ internal static class SchemeCursors
                 CursorFile.WriteCur(FilePath(dir, role), sizes.Select(c => CursorRenderer.RenderFrame(style, glyph, 0, baseSize, c)).ToList());
             }
         }
+        if (cfg.ClickFlash.Enabled)
+        {
+            foreach (bool right in new[] { false, true })
+            {
+                var flashStyle = cfg.ClickFlash.Apply(style, right);
+                foreach (var (role, _) in Values)
+                {
+                    if (CursorRenderer.IsAnimated(role)) continue; // busy cursors keep spinning, never flashed
+                    var glyph = same ? CursorRole.Pointer : role;
+                    CursorFile.WriteCur(FlashPath(dir, role, right),
+                        sizes.Select(c => CursorRenderer.RenderFrame(flashStyle, glyph, 0, baseSize, c)).ToList());
+                }
+            }
+        }
         File.WriteAllText(Path.Combine(dir, "complete"), "");
     }
 
@@ -111,6 +138,8 @@ internal static class SchemeCursors
         var sb = new StringBuilder(RenderVersion).Append('|').Append(baseSize).Append('|').Append(cfg.StateCursors).Append('|');
         var s = cfg.Style;
         sb.Append($"{s.Shape}|{s.Size}|{s.Fill}|{s.Outline}|{s.OutlineWidth}|{s.Glow}|{s.GlowColor}|{s.GlowRadius}|{s.GlowStrength}|{s.Shadow}|{s.Opacity}|{s.CustomHotX}|{s.CustomHotY}");
+        var f = cfg.ClickFlash;
+        if (f.Enabled) sb.Append($"|flash|{f.LeftColor}|{f.RightColor}");
         if (s.Shape == CursorShape.Custom)
         {
             try { sb.Append('|').Append(File.GetLastWriteTimeUtc(ConfigStore.CustomImagePath).Ticks); }

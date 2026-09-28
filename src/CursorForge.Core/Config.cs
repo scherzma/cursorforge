@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace CursorForge;
 
@@ -68,6 +68,24 @@ public sealed class OverlayApp
     }
 }
 
+public sealed class ClickFlash
+{
+    public bool Enabled { get; set; }
+    public string LeftColor { get; set; } = "#FFFFD60A";
+    public string RightColor { get; set; } = "#FF22D3EE";
+    /// <summary>Minimum time the flash stays visible; it also lasts as long as the button is held.</summary>
+    public int DurationMs { get; set; } = 150;
+
+    /// <summary>The cursor style shown while the given button is down.</summary>
+    public CursorStyle Apply(CursorStyle style, bool right)
+    {
+        var s = style.Clone();
+        s.Fill = right ? RightColor : LeftColor;
+        if (s.Glow) s.GlowColor = s.Fill;
+        return s;
+    }
+}
+
 public sealed class Hotkey
 {
     public const uint Alt = 0x1, Control = 0x2, Shift = 0x4, Win = 0x8;
@@ -95,6 +113,8 @@ public sealed class AppConfig
     public bool ReplaceOther { get; set; } = true;
     public StateCursorMode StateCursors { get; set; } = StateCursorMode.Matching;
 
+    public ClickFlash ClickFlash { get; set; } = new();
+
     public bool OverlayEnabled { get; set; } = true;
     public List<OverlayApp> OverlayApps { get; set; } = [];
 
@@ -116,6 +136,10 @@ public sealed class AppConfig
         OverlayApps ??= [];
         ToggleHotkey ??= new();
         OverlayHotkey ??= new();
+        ClickFlash ??= new();
+        ClickFlash.DurationMs = Math.Clamp(ClickFlash.DurationMs, 50, 1000);
+        ClickFlash.LeftColor = Rgba.TryParse(ClickFlash.LeftColor, out _) ? ClickFlash.LeftColor : "#FFFFD60A";
+        ClickFlash.RightColor = Rgba.TryParse(ClickFlash.RightColor, out _) ? ClickFlash.RightColor : "#FF22D3EE";
         PresetId ??= "";
         var s = Style;
         s.Size = Math.Clamp(s.Size, 8, 200);

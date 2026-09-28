@@ -204,6 +204,12 @@ internal static unsafe partial class Native
     [LibraryImport("kernel32.dll", EntryPoint = "Process32NextW")] public static partial int Process32Next(nint snap, PROCESSENTRY32W* e);
     [LibraryImport("kernel32.dll")] public static partial int CloseHandle(nint h);
     [LibraryImport("dwmapi.dll")] public static partial int DwmFlush();
+
+    // ---- input state (click flash) ----
+    [StructLayout(LayoutKind.Sequential)] public struct LASTINPUTINFO { public uint cbSize, dwTime; }
+    [LibraryImport("user32.dll")] public static partial short GetAsyncKeyState(int vk);
+    [LibraryImport("user32.dll")] public static partial int GetLastInputInfo(LASTINPUTINFO* info);
+    [LibraryImport("kernel32.dll")] public static partial uint WaitForMultipleObjects(uint count, nint* handles, int waitAll, uint ms);
     [LibraryImport("dwmapi.dll")] public static partial int DwmGetCompositionTimingInfo(nint hwnd, byte* info);
     [LibraryImport("kernel32.dll", EntryPoint = "CreateWaitableTimerExW")] public static partial nint CreateWaitableTimerEx(nint attrs, nint name, uint flags, uint access);
     [LibraryImport("kernel32.dll")] public static partial int SetWaitableTimer(nint timer, long* dueTime, int period, nint completion, nint arg, int resume);
