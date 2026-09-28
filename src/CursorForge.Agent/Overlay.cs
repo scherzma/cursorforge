@@ -10,6 +10,10 @@ namespace CursorForge.Agent;
 ///
 /// Cost model: while no listed app is focused the thread sleeps on an event (0% CPU). While one is
 /// focused it polls ~60x/s; while the overlay is visible it follows the cursor once per DWM frame.
+///
+/// Latency: DWM composes window positions once per refresh, so an overlay can never match the hardware
+/// cursor exactly. To keep the gap to about one refresh, the position is "late latched": sampled a
+/// moment before the compositor's deadline instead of right after the previous frame.
 /// </summary>
 internal sealed unsafe class Overlay
 {
@@ -33,6 +37,11 @@ internal sealed unsafe class Overlay
     bool _hasImage, _visible;
     int _hotX, _hotY, _lastX = int.MinValue, _lastY = int.MinValue, _pinned;
     long _lastTopmost;
+    nint _timer;
+    readonly byte[] _timing = new byte[DwmTimingInfoSize];
+
+    // DWM_TIMING_INFO is #pragma pack(1): 292 bytes, qpcRefreshPeriod at 12, qpcVBlank at 28.
+    const int DwmTimingInfoSize = 292, OffRefreshPeriod = 12, OffVBlank = 28;
 
     public void Start()
     {
@@ -86,6 +95,8 @@ internal sealed unsafe class Overlay
         _hwnd = CreateWindowEx(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
             WindowClass, "CursorForge Overlay", WS_POPUP, 0, 0, 1, 1, 0, 0, inst, 0);
 
+        _timer = CreateWaitableTimerEx(0, 0, 0x2 /* CREATE_WAITABLE_TIMER_HIGH_RESOLUTION */, 0x1F0003);
+
         MSG msg;
         while (!_stop)
         {
@@ -105,13 +116,38 @@ internal sealed unsafe class Overlay
 
             // Visible: pace to the compositor so we move exactly once per frame, right after it presents.
             // Hidden: cheap ~60 Hz poll so we notice when the game shows its cursor again.
-            if (!_visible || DwmFlush() != 0) Wait(_visible ? 4u : 10u);
+            if (!_visible) Wait(10);
+            else if (DwmFlush() != 0) Wait(4);
+            else SleepUntilLatch();
             if (!_active || _stop) continue;
 
             if (ShouldShow(out int x, out int y)) Show(x, y);
             else Hide();
         }
         if (_hwnd != 0) DestroyWindow(_hwnd);
+        if (_timer != 0) CloseHandle(_timer);
+    }
+
+    /// <summary>After a composition: sleep until shortly before the next vblank, then sample the cursor.</summary>
+    void SleepUntilLatch()
+    {
+        if (_timer == 0) return;
+        fixed (byte* t = _timing)
+        {
+            *(uint*)t = DwmTimingInfoSize;
+            if (DwmGetCompositionTimingInfo(0, t) != 0) return;
+            long period = *(long*)(t + OffRefreshPeriod), vblank = *(long*)(t + OffVBlank);
+            long freq = System.Diagnostics.Stopwatch.Frequency, now = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (period <= 0 || period > freq / 20) return; // < 20 Hz: timing info is bogus
+            long next = vblank + period;
+            while (next <= now) next += period;
+            // Leave DWM a safety margin to pick the new position up for this refresh.
+            long margin = Math.Max(freq * 15 / 10000, period / 5); // max(1.5 ms, 20% of a frame)
+            long waitTicks = next - margin - now;
+            if (waitTicks <= freq / 2000) return; // < 0.5 ms: don't bother
+            long due = -(waitTicks * 10_000_000 / freq); // relative, in 100 ns units
+            if (SetWaitableTimer(_timer, &due, 0, 0, 0, 0) != 0) WaitForSingleObject(_timer, 100);
+        }
     }
 
     void Wait(uint ms)

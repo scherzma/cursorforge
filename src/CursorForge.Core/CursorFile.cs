@@ -103,7 +103,18 @@ public static class CursorFile
 /// <summary>The Windows "Mouse pointer size" setting, which fixes the pixel size of scheme cursors.</summary>
 public static class WindowsPointer
 {
-    /// <summary>Side length in pixels Windows draws scheme cursors at (32 = default size).</summary>
+    /// <summary>
+    /// Scheme canvas needed for this style: the user's pointer size, raised (in steps of 8 px) when the cursor
+    /// needs more room. Hardware cursors top out at 256 px.
+    /// </summary>
+    public static int CanvasFor(CursorStyle style, int userBaseSize)
+    {
+        int needed = CursorRenderer.Render(style).Width;
+        needed = (needed + 7) / 8 * 8;
+        return Math.Clamp(Math.Max(userBaseSize, needed), 32, CursorRenderer.MaxCanvas);
+    }
+
+    /// <summary>The user's own pointer size as saved in their settings (32 = default size).</summary>
     public static int BaseSize()
     {
         try

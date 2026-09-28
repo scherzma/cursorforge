@@ -97,7 +97,7 @@ public static class CursorRenderer
     public static int MaxSizeFor(CursorStyle style, int canvas)
     {
         var s = style.Clone();
-        int lo = 8, hi = 160;
+        int lo = 8, hi = 200;
         while (lo < hi)
         {
             int mid = (lo + hi + 1) / 2;

@@ -106,7 +106,7 @@ internal static unsafe class Program
     static RenderedCursor RenderSafe()
     {
         // Same size as the scheme cursors, so the game overlay matches the desktop cursor.
-        try { return CursorRenderer.Render(CursorRenderer.Effective(_cfg.Style, WindowsPointer.BaseSize())); }
+        try { return CursorRenderer.Render(CursorRenderer.Effective(_cfg.Style, CursorRenderer.MaxCanvas)); }
         catch { return CursorRenderer.Render(Presets.Default.Style); }
     }
 
@@ -301,7 +301,8 @@ internal static unsafe class Program
 
                 case WM_SETTINGCHANGE:
                     // Windows reloaded the cursor scheme (Settings app, accessibility size, etc.) -> put ours back.
-                    if ((uint)w == SPI_SETCURSORS && Environment.TickCount64 - _lastApplyTick > 1000) ScheduleReapply();
+                    // (0x2029 = pointer size changed in Settings.)
+                    if ((uint)w is SPI_SETCURSORS or 0x2029 && Environment.TickCount64 - _lastApplyTick > 1000) ScheduleReapply();
                     break;
 
                 case WM_DISPLAYCHANGE:

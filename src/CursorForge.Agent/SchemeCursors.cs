@@ -16,7 +16,8 @@ namespace CursorForge.Agent;
 internal static class SchemeCursors
 {
     const string KeyPath = @"Control Panel\Cursors";
-    const string RenderVersion = "3"; // bump when rendering changes, to regenerate cached files
+    const string RenderVersion = "4"; // bump when rendering changes, to regenerate cached files
+    const uint SPI_SETCURSORBASESIZE = 0x2029; // undocumented; what Settings uses for "pointer size"
 
     static readonly (CursorRole Role, string Value)[] Values =
     [
@@ -32,7 +33,9 @@ internal static class SchemeCursors
 
     public static void Apply(AppConfig cfg)
     {
-        int baseSize = WindowsPointer.BaseSize();
+        // Big cursors need a bigger canvas than the user's pointer size: raise it for this session only
+        // (no SPIF_UPDATEINIFILE, so the saved setting is untouched and comes back at logon / on Restore).
+        int baseSize = WindowsPointer.CanvasFor(cfg.Style, WindowsPointer.BaseSize());
         var selected = CursorRoles.Selected(cfg).Select(r => r.Role).ToHashSet();
         string dir = Path.Combine(CursorsDir, Fingerprint(cfg, baseSize));
         if (!File.Exists(Path.Combine(dir, "complete"))) Generate(cfg, baseSize, dir);
@@ -46,6 +49,7 @@ internal static class SchemeCursors
                 else RestoreValue(key, value, backup);
             }
         }
+        SystemParametersInfo(SPI_SETCURSORBASESIZE, 0, baseSize, 0);
         SystemParametersInfo(SPI_SETCURSORS, 0, 0, 0);
         DeleteStale(dir);
     }
@@ -69,6 +73,7 @@ internal static class SchemeCursors
             }
         }
         catch { }
+        SystemParametersInfo(SPI_SETCURSORBASESIZE, 0, WindowsPointer.BaseSize(), 0);
         SystemParametersInfo(SPI_SETCURSORS, 0, 0, 0);
     }
 

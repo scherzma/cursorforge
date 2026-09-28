@@ -31,8 +31,10 @@ which is why CursorForge doesn't use them.) Because the scheme is written to the
 Each state gets a matching glyph in your style: link hand, I-beam, animated busy spinner, working, unavailable,
 precision, move, four resize arrows, alternate select, and help/pin/person.
 
-The largest *sharp* size is bounded by the Windows pointer size (Settings → Accessibility → Mouse pointer and touch → Size),
-because Windows draws scheme cursors on a canvas of exactly that size. The UI shows the limit and links to the setting.
+Windows draws scheme cursors on a canvas the size of its pointer-size setting. When your cursor needs more room,
+CursorForge raises that canvas **for the current session only** (`SPI_SETCURSORBASESIZE` without saving), up to 256 px,
+the hardware-cursor limit. Your saved pointer size is untouched and comes back on exit. One side effect while raised:
+Windows scales *other* apps' own cursors by the same factor, just as if you had enlarged the pointer size yourself.
 Your original scheme is backed up to `%APPDATA%\CursorForge\windows-cursors-backup.txt` and restored when the agent exits,
 is disabled, or on `CursorForge.Agent.exe --exit`.
 
@@ -43,14 +45,14 @@ It is visible only while the game shows a cursor, and hidden when the cursor is 
 - *Auto*: follow the OS cursor's visibility (recommended; safe for shooters).
 - *Always*: also show over games that hide the OS cursor and draw a software cursor. It still hides while the cursor is clipped or pinned to the centre.
 
-The overlay trails the hardware cursor by about one frame, and a visible topmost window can take a borderless game
-off its direct-flip path while shown. That's why it is per app and disappears whenever the game hides the cursor.
+The overlay can't be truly zero-latency: DWM composes window positions once per refresh, while the hardware
+cursor is latched at scan-out. CursorForge "late latches" the overlay: it samples the cursor just before DWM's
+deadline instead of right after the previous frame. That keeps it about one refresh behind the hardware cursor (≈7 ms at 144 Hz)
+instead of about two. A visible topmost window can also take a borderless game off its direct-flip path while shown.
+For both reasons the overlay is per app and disappears whenever the game hides its cursor.
 
-**Anti-cheat.** No DLL injection, no input hooks (`SetWindowsHookEx`), no reading or writing game memory, and no handles
-opened to the game process. Process names come from a Toolhelp snapshot. Everything uses public, documented
-user-mode APIs that screen recorders and overlays also use. No tool can *guarantee* how every anti-cheat behaves,
-but there is nothing here for one to object to. For competitive shooters you normally don't need the overlay at all:
-their menus use the standard cursor, which the system swap already covers.
+League of Legends uses its own hardware cursor, which nothing outside the game can replace without injection or
+modified game files; under Vanguard, even paid YoloMouse falls back to an overlay there.
 
 ## Hotkeys (configurable)
 

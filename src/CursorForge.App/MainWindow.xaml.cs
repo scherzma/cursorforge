@@ -280,16 +280,20 @@ public partial class MainWindow : Window
     void RefreshVisuals()
     {
         var s = _cfg.Style;
-        // Windows shows scheme cursors on a fixed canvas (its pointer size); bigger would have to be scaled = blurry.
+        // Windows shows scheme cursors on a canvas of its pointer size; bigger cursors raise it (up to 256 px,
+        // the hardware-cursor limit) while CursorForge runs.
         int baseSize = WindowsPointer.BaseSize();
-        int maxSharp = Math.Clamp(CursorRenderer.MaxSizeFor(s, baseSize), (int)SizeSlider.Minimum + 1, 96);
+        int maxSharp = Math.Clamp(CursorRenderer.MaxSizeFor(s, CursorRenderer.MaxCanvas), (int)SizeSlider.Minimum + 1, 200);
         bool wasLoading = _loading;
         _loading = true;
         SizeSlider.Maximum = maxSharp;
         SizeSlider.Value = Math.Min(s.Size, maxSharp);
         _loading = wasLoading;
-        var shown = CursorRenderer.Effective(s, baseSize);
-        SizeLimitText.Text = $"Up to {maxSharp} px stays pixel-sharp at your Windows pointer size.";
+        var shown = CursorRenderer.Effective(s, CursorRenderer.MaxCanvas);
+        int canvas = WindowsPointer.CanvasFor(shown, baseSize);
+        SizeLimitText.Text = canvas > baseSize
+            ? $"Pixel-sharp. Windows' pointer size is raised to {canvas} px while CursorForge runs (yours: {baseSize} px)."
+            : $"Pixel-sharp. Fits your Windows pointer size ({baseSize} px).";
         SizeValue.Text = $"{shown.Size} px";
         OutlineValue.Text = s.OutlineWidth == 0 ? "off" : $"{s.OutlineWidth:0.#} px";
         GlowSizeValue.Text = $"{s.GlowRadius:0} px";

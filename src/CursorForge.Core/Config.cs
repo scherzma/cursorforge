@@ -118,7 +118,7 @@ public sealed class AppConfig
         OverlayHotkey ??= new();
         PresetId ??= "";
         var s = Style;
-        s.Size = Math.Clamp(s.Size, 8, 96);
+        s.Size = Math.Clamp(s.Size, 8, 200);
         s.OutlineWidth = Math.Clamp(s.OutlineWidth, 0, 8);
         s.GlowRadius = Math.Clamp(s.GlowRadius, 1, 24);
         s.GlowStrength = Math.Clamp(s.GlowStrength, 0, 1);
