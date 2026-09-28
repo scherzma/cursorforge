@@ -51,7 +51,40 @@ public sealed class CursorStyle
     public float CustomHotX { get; set; }
     public float CustomHotY { get; set; }
 
-    public CursorStyle Clone() => (CursorStyle)MemberwiseClone();
+    /// <summary>
+    /// Per-state icon choice, keyed by <see cref="CursorRole"/> name: "Pointer" (the main pointer) or a
+    /// <see cref="CursorShape"/> name. Missing = the state's own matching glyph.
+    /// </summary>
+    public Dictionary<string, string> StateGlyphs { get; set; } = [];
+
+    /// <summary>Special <see cref="Fill"/> value: the fill shows the inverse of whatever is behind the cursor.</summary>
+    public const string Invert = "Invert";
+    public const string GlyphDefault = "Default", GlyphPointer = "Pointer";
+
+    /// <summary>Inverted fill (XOR with the screen). Not for imported images.</summary>
+    [JsonIgnore] public bool IsInverted => string.Equals(Fill, Invert, StringComparison.OrdinalIgnoreCase) && Shape != CursorShape.Custom;
+
+    public string GlyphFor(CursorRole role) =>
+        StateGlyphs != null && StateGlyphs.TryGetValue(role.ToString(), out var g) ? g : GlyphDefault;
+
+    /// <summary>
+    /// A normal (alpha-blended) stand-in for places that can't invert what's behind them: UI previews,
+    /// the tray icon and the game overlay.
+    /// </summary>
+    public CursorStyle ForDisplay(bool darkBackground)
+    {
+        if (!IsInverted) return this;
+        var s = Clone();
+        s.Fill = darkBackground ? "#FFEDEDED" : "#FF141414";
+        return s;
+    }
+
+    public CursorStyle Clone()
+    {
+        var c = (CursorStyle)MemberwiseClone();
+        c.StateGlyphs = new Dictionary<string, string>(StateGlyphs ?? []);
+        return c;
+    }
 
     internal void Normalize()
     {
@@ -62,7 +95,16 @@ public sealed class CursorStyle
         Opacity = Math.Clamp(Opacity, 0.1f, 1);
         CustomHotX = Math.Clamp(CustomHotX, 0, 1);
         CustomHotY = Math.Clamp(CustomHotY, 0, 1);
-        Fill = Rgba.TryParse(Fill, out _) ? Fill : "#FFFFFFFF";
+        Fill = string.Equals(Fill, Invert, StringComparison.OrdinalIgnoreCase) ? Invert
+            : Rgba.TryParse(Fill, out _) ? Fill : "#FFFFFFFF";
+        StateGlyphs ??= [];
+        foreach (var key in StateGlyphs.Keys.ToList())
+        {
+            string v = StateGlyphs[key];
+            bool validKey = Enum.TryParse<CursorRole>(key, out var role) && role != CursorRole.Pointer;
+            bool validValue = v == GlyphPointer || (Enum.TryParse<CursorShape>(v, out var sh) && sh != CursorShape.Custom);
+            if (!validKey || !validValue) StateGlyphs.Remove(key);
+        }
         Outline = Rgba.TryParse(Outline, out _) ? Outline : "#FF000000";
         GlowColor = Rgba.TryParse(GlowColor, out _) ? GlowColor : "#FF22D3EE";
         HotspotDotColor = Rgba.TryParse(HotspotDotColor, out _) ? HotspotDotColor : "#FFFF3B30";

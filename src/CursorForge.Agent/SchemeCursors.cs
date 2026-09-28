@@ -16,7 +16,7 @@ namespace CursorForge.Agent;
 internal static class SchemeCursors
 {
     const string KeyPath = @"Control Panel\Cursors";
-    const string RenderVersion = "6"; // bump when rendering changes, to regenerate cached files
+    const string RenderVersion = "7"; // bump when rendering changes, to regenerate cached files
     const uint SPI_SETCURSORBASESIZE = 0x2029; // undocumented; what Settings uses for "pointer size"
 
     static readonly (CursorRole Role, string Value)[] Values =
@@ -100,9 +100,11 @@ internal static class SchemeCursors
         foreach (var (role, _) in Values)
         {
             var glyph = same ? CursorRole.Pointer : role;
-            if (!same && CursorRenderer.IsAnimated(role))
+            if (CursorRenderer.IsAnimated(role))
             {
-                var frames = Enumerable.Range(0, CursorRenderer.SpinnerFrames)
+                // .ani file either way; a single frame when the state was given a static icon.
+                int count = !same && CursorRenderer.IsAnimated(style, role) ? CursorRenderer.SpinnerFrames : 1;
+                var frames = Enumerable.Range(0, count)
                     .Select(f => (IReadOnlyList<RenderedCursor>)sizes.Select(c => CursorRenderer.RenderFrame(style, glyph, f, baseSize, c)).ToList())
                     .ToList();
                 CursorFile.WriteAni(FilePath(dir, role), frames, CursorRenderer.SpinnerJiffies);
@@ -137,7 +139,7 @@ internal static class SchemeCursors
     {
         var sb = new StringBuilder(RenderVersion).Append('|').Append(baseSize).Append('|').Append(cfg.StateCursors).Append('|');
         var s = cfg.Style;
-        sb.Append($"{s.Shape}|{s.Size}|{s.Fill}|{s.Outline}|{s.OutlineWidth}|{s.Glow}|{s.GlowColor}|{s.GlowRadius}|{s.GlowStrength}|{s.Shadow}|{s.Opacity}|{s.CustomHotX}|{s.CustomHotY}|{s.HotspotDot}|{s.HotspotDotColor}|{s.HotspotDotSize}");
+        sb.Append($"{s.Shape}|{s.Size}|{s.Fill}|{s.Outline}|{s.OutlineWidth}|{s.Glow}|{s.GlowColor}|{s.GlowRadius}|{s.GlowStrength}|{s.Shadow}|{s.Opacity}|{string.Join(",", s.StateGlyphs.OrderBy(kv => kv.Key).Select(kv => kv.Key + "=" + kv.Value))}|{s.CustomHotX}|{s.CustomHotY}|{s.HotspotDot}|{s.HotspotDotColor}|{s.HotspotDotSize}");
         var f = cfg.ClickFlash;
         if (f.Enabled) sb.Append($"|flash|{f.LeftColor}|{f.RightColor}");
         if (s.Shape == CursorShape.Custom)

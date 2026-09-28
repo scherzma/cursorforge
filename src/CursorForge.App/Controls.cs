@@ -18,9 +18,25 @@ public sealed class ColorRow : WrapPanel
 
     public event Action? Changed;
 
-    public ColorRow()
+    public ColorRow(bool allowInvert = false)
     {
         Orientation = Orientation.Horizontal;
+        if (allowInvert)
+        {
+            // Half black / half white: "shows the inverse of what's behind the cursor"
+            var invert = new Border
+            {
+                Width = 22, Height = 22, CornerRadius = new CornerRadius(11), Margin = new Thickness(0, 0, 6, 0),
+                BorderThickness = new Thickness(2), Cursor = Cursors.Hand, Tag = CursorStyle.Invert, VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Invert: shows the inverse of whatever is behind the cursor",
+                Background = new LinearGradientBrush(
+                    [new GradientStop(Colors.White, 0), new GradientStop(Colors.White, 0.5), new GradientStop(Colors.Black, 0.5), new GradientStop(Colors.Black, 1)],
+                    new Point(0, 0), new Point(1, 1)),
+            };
+            invert.MouseLeftButtonUp += (_, _) => Set(CursorStyle.Invert, raise: true);
+            _swatches.Add(invert);
+            Children.Add(invert);
+        }
         foreach (var c in Palette)
         {
             var b = new Border
@@ -49,13 +65,25 @@ public sealed class ColorRow : WrapPanel
     void CommitHex()
     {
         string t = _hex.Text.Trim();
+        if (_allowInvertValue(t)) { Set(CursorStyle.Invert, raise: true); return; }
         if (!t.StartsWith('#')) t = "#" + t;
         if (Rgba.TryParse(t, out _)) Set(t.Length == 7 ? AlphaOf(_value) + t[1..] : t[1..], raise: true);
         else _hex.Text = _value;
     }
 
+    bool _allowInvertValue(string v) =>
+        string.Equals(v.Trim(), CursorStyle.Invert, StringComparison.OrdinalIgnoreCase) && _swatches.Any(b => (string)b.Tag == CursorStyle.Invert);
+
     void Set(string v, bool raise)
     {
+        if (_allowInvertValue(v))
+        {
+            bool was = _value != CursorStyle.Invert;
+            _value = CursorStyle.Invert;
+            Refresh();
+            if (raise && was) Changed?.Invoke();
+            return;
+        }
         v = v.Trim().TrimStart('#').ToUpperInvariant();
         if (v.Length == 6) v = "FF" + v;
         if (!Rgba.TryParse(v, out _)) return;
@@ -72,7 +100,9 @@ public sealed class ColorRow : WrapPanel
         string rgb = _value.Length == 9 ? _value[3..] : _value.TrimStart('#');
         foreach (var b in _swatches)
         {
-            bool sel = string.Equals(((string)b.Tag).TrimStart('#'), rgb, StringComparison.OrdinalIgnoreCase);
+            bool sel = (string)b.Tag == CursorStyle.Invert
+                ? _value == CursorStyle.Invert
+                : string.Equals(((string)b.Tag).TrimStart('#'), rgb, StringComparison.OrdinalIgnoreCase);
             b.BorderBrush = sel ? (Brush)Application.Current.FindResource("Accent") : new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF));
         }
     }

@@ -95,7 +95,18 @@ public static class CursorFile
         bw.Write(0); bw.Write(w * h * 4 + maskStride * h);
         bw.Write(0); bw.Write(0); bw.Write(0); bw.Write(0);
         for (int y = h - 1; y >= 0; y--) bw.Write(rc.Pixels, y * w * 4, w * 4);
-        bw.Write(new byte[maskStride * h]);
+        var and = new byte[maskStride * h];
+        if (rc.Mask != null)
+        {
+            // 1 bit per pixel, MSB first, bottom-up rows. (With all-zero alpha, Windows uses this AND mask.)
+            for (int y = 0; y < h; y++)
+            {
+                int row = (h - 1 - y) * maskStride;
+                for (int x = 0; x < w; x++)
+                    if (rc.Mask[y * w + x] != 0) and[row + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+            }
+        }
+        bw.Write(and);
         return ms.ToArray();
     }
 }

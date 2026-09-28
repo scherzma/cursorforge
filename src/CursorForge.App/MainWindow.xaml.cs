@@ -15,11 +15,12 @@ public partial class MainWindow : Window
     double _ppd = 1;
     readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
     readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(2) };
-    readonly ColorRow _fill = new(), _outline = new(), _glow = new(), _flashLeft = new(), _flashRight = new(), _hotDot = new();
+    readonly ColorRow _fill = new(allowInvert: true), _outline = new(), _glow = new(), _flashLeft = new(), _flashRight = new(), _hotDot = new();
     readonly List<(RadioButton Button, string Id)> _presetButtons = [];
     string _savedSignature = "";
     readonly Dictionary<CursorShape, (RadioButton Button, Image? Icon)> _shapeButtons = [];
     readonly Dictionary<CursorRole, Image> _stateImages = [];
+    readonly Dictionary<CursorRole, Border> _stateTiles = [];
     readonly Dictionary<CursorRole, BitmapSource[]> _stateFrames = [];
     readonly DispatcherTimer _spinTimer = new() { Interval = TimeSpan.FromMilliseconds(CursorRenderer.SpinnerJiffies * 1000 / 60.0) };
     int _spinFrame;
@@ -137,7 +138,7 @@ public partial class MainWindow : Window
     {
         var img = new Image
         {
-            Source = ToBitmap(CursorRenderer.Render(style)),
+            Source = ToBitmap(CursorRenderer.Render(style.ForDisplay(darkBackground: true))),
             Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly,
             MaxWidth = 76, MaxHeight = 76,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
@@ -237,24 +238,97 @@ public partial class MainWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             };
             _stateImages[role] = img;
-            StatesPanel.Children.Add(new Border
+            var tile = new Border
             {
                 Width = 44, Height = 44, CornerRadius = new CornerRadius(10), Margin = new Thickness(0, 0, 6, 6),
-                Background = (Brush)FindResource("Surface2"), Child = img, ToolTip = name,
-            });
+                Background = (Brush)FindResource("Surface2"), BorderThickness = new Thickness(1.5), Child = img, ToolTip = name,
+                Cursor = role == CursorRole.Pointer ? null : Cursors.Hand,
+            };
+            if (role != CursorRole.Pointer)
+                tile.MouseLeftButtonUp += (_, _) => ShowGlyphMenu(tile, role, name);
+            _stateTiles[role] = tile;
+            StatesPanel.Children.Add(tile);
         }
     }
+
+    static readonly string[] GlyphChoices =
+        [CursorStyle.GlyphDefault, CursorStyle.GlyphPointer,
+         .. Enum.GetValues<CursorShape>().Where(s => s != CursorShape.Custom).Select(s => s.ToString())];
+
+    static string GlyphLabel(string glyph, CursorRole role) => glyph switch
+    {
+        CursorStyle.GlyphDefault => role switch
+        {
+            CursorRole.Link => "Hand (default)",
+            CursorRole.Text => "I-beam (default)",
+            CursorRole.Busy => "Spinner (default)",
+            CursorRole.Working => "Pointer + spinner (default)",
+            CursorRole.Unavailable => "No sign (default)",
+            CursorRole.Precision => "Crosshair (default)",
+            CursorRole.Move => "Move arrows (default)",
+            CursorRole.SizeNS or CursorRole.SizeWE or CursorRole.SizeNWSE or CursorRole.SizeNESW => "Resize arrow (default)",
+            CursorRole.Up => "Up arrow (default)",
+            _ => "Pointer + badge (default)",
+        },
+        CursorStyle.GlyphPointer => "Same as main pointer",
+        _ => glyph,
+    };
+
+    /// <summary>Picker for one state's icon: its own glyph, the main pointer, or any shape.</summary>
+    void ShowGlyphMenu(FrameworkElement anchor, CursorRole role, string name)
+    {
+        if (_cfg.StateCursors == StateCursorMode.Same)
+        {
+            MessageBox.Show(this, "\u201CSame\u201D is selected, so every state shows the main pointer. Switch to \u201CMatching set\u201D to pick icons per state.",
+                "CursorForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        menu.Items.Add(new MenuItem { Header = name, IsEnabled = false, FontWeight = FontWeights.SemiBold, Foreground = (Brush)FindResource("Muted") });
+        string current = _cfg.Style.GlyphFor(role);
+        int iconPx = (int)Math.Round(22 * _ppd);
+        foreach (var glyph in GlyphChoices)
+        {
+            var preview = _cfg.Style.Clone();
+            preview.StateGlyphs[role.ToString()] = glyph;
+            var icon = new Image
+            {
+                Width = 22, Height = 22, Margin = new Thickness(0, 0, 10, 0), Stretch = Stretch.Uniform,
+                Source = ToBitmap(CursorRenderer.RenderIcon(preview, iconPx, role)),
+            };
+            var header = new DockPanel();
+            var check = new TextBlock { Text = glyph == current ? "\u2713" : "", Width = 16, Foreground = (Brush)FindResource("Accent"), FontWeight = FontWeights.Bold };
+            header.Children.Add(check);
+            header.Children.Add(icon);
+            header.Children.Add(new TextBlock { Text = GlyphLabel(glyph, role), VerticalAlignment = VerticalAlignment.Center });
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) =>
+            {
+                if (glyph == CursorStyle.GlyphDefault) _cfg.Style.StateGlyphs.Remove(role.ToString());
+                else _cfg.Style.StateGlyphs[role.ToString()] = glyph;
+                RefreshVisuals();
+                ScheduleSave();
+            };
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
+    }
+
 
     void RefreshStates(CursorStyle s)
     {
         _stateFrames.Clear();
         bool same = _cfg.StateCursors == StateCursorMode.Same;
+        s = s.ForDisplay(darkBackground: true);
         foreach (var (role, _) in StateNames)
         {
-            int frames = !same && CursorRenderer.IsAnimated(role) ? CursorRenderer.SpinnerFrames : 1;
+            int frames = !same && CursorRenderer.IsAnimated(s, role) ? CursorRenderer.SpinnerFrames : 1;
             var bmps = new BitmapSource[frames];
             for (int f = 0; f < frames; f++)
                 bmps[f] = ToBitmap(same ? CursorRenderer.Render(s) : CursorRenderer.RenderRole(s, role, f));
+            if (_stateTiles.TryGetValue(role, out var tile))
+                tile.BorderBrush = !same && s.GlyphFor(role) != CursorStyle.GlyphDefault
+                    ? (Brush)FindResource("Accent") : Brushes.Transparent;
             _stateFrames[role] = bmps;
             if (_stateImages.TryGetValue(role, out var img)) img.Source = bmps[_spinFrame % frames];
         }
@@ -390,10 +464,9 @@ public partial class MainWindow : Window
         PresetHint.Text = preset != null ? $"Based on {preset.Name}"
             : savedPreset != null ? $"Based on {savedPreset.Name}" : "Custom style";
 
-        var rc = CursorRenderer.Render(shown);
-        var bmp = ToBitmap(rc);
-        PreviewLight.Source = bmp;
-        PreviewDark.Source = bmp;
+        PreviewLight.Source = ToBitmap(CursorRenderer.Render(shown.ForDisplay(darkBackground: false)));
+        PreviewDark.Source = ToBitmap(CursorRenderer.Render(shown.ForDisplay(darkBackground: true)));
+        InvertHint.Visibility = s.IsInverted ? Visibility.Visible : Visibility.Collapsed;
         LogoImage.Source = ToBitmap(CursorRenderer.RenderIcon(s, (int)Math.Round(28 * _ppd)));
 
         RefreshStates(shown);

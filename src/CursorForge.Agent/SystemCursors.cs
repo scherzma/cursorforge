@@ -88,7 +88,13 @@ internal static unsafe class SystemCursors
             Buffer.MemoryCopy(src, bits, rc.Pixels.Length, rc.Pixels.Length);
 
         // All-zero AND mask: the alpha channel of the colour bitmap decides transparency.
-        var maskBits = new byte[((rc.Width + 15) / 16) * 2 * rc.Height];
+        // AND mask: all zero (alpha decides), or the real mask of an inverted cursor (rows WORD-aligned, top-down).
+        int stride = ((rc.Width + 15) / 16) * 2;
+        var maskBits = new byte[stride * rc.Height];
+        if (rc.Mask != null)
+            for (int y = 0; y < rc.Height; y++)
+                for (int x = 0; x < rc.Width; x++)
+                    if (rc.Mask[y * rc.Width + x] != 0) maskBits[y * stride + (x >> 3)] |= (byte)(0x80 >> (x & 7));
         nint mask;
         fixed (byte* m = maskBits) mask = CreateBitmap(rc.Width, rc.Height, 1, 1, m);
 

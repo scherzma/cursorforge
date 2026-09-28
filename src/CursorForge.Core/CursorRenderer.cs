@@ -11,6 +11,11 @@ public sealed class RenderedCursor
     public required int HotX { get; init; }
     public required int HotY { get; init; }
     public required byte[] Pixels { get; init; }
+    /// <summary>
+    /// Only for inverted cursors: the AND mask, one byte per pixel (1 = keep the screen). Pixels then carry the
+    /// XOR colour with alpha 0 - white where the mask is 1 inverts the screen, like Windows' inverted pointer.
+    /// </summary>
+    public byte[]? Mask { get; init; }
 }
 
 public readonly record struct Rgba(float R, float G, float B, float A)
@@ -44,13 +49,27 @@ public static class CursorRenderer
     public static RenderedCursor Render(CursorStyle style) =>
         WithHotspotDot(style, RenderCore(style, style.Size, style.Glow, style.Shadow));
 
+    /// <summary>States whose file is an animated cursor (.ani).</summary>
     public static bool IsAnimated(CursorRole role) => role is CursorRole.Busy or CursorRole.Working;
 
+    /// <summary>Whether the state actually spins with this style (a replaced icon is static).</summary>
+    public static bool IsAnimated(CursorStyle style, CursorRole role) =>
+        IsAnimated(role) && style.GlyphFor(role) == CursorStyle.GlyphDefault;
+
     /// <summary>Renders the cursor for one Windows cursor state, in the style of the main pointer.</summary>
-    public static RenderedCursor RenderRole(CursorStyle style, CursorRole role, int frame = 0) =>
-        role == CursorRole.Pointer
-            ? Render(style)
-            : WithHotspotDot(style, RenderCore(style, style.Size, style.Glow, style.Shadow, role, frame));
+    public static RenderedCursor RenderRole(CursorStyle style, CursorRole role, int frame = 0)
+    {
+        if (role == CursorRole.Pointer) return Render(style);
+        string glyph = style.GlyphFor(role);
+        if (glyph == CursorStyle.GlyphPointer) return Render(style);
+        if (glyph != CursorStyle.GlyphDefault && Enum.TryParse<CursorShape>(glyph, out var shape) && shape != CursorShape.Custom)
+        {
+            var s = style.Clone();
+            s.Shape = shape;
+            return Render(s);
+        }
+        return WithHotspotDot(style, RenderCore(style, style.Size, style.Glow, style.Shadow, role, frame));
+    }
 
     /// <summary>
     /// Marks the hotspot (where Windows delivers the click) with a dot centred on that pixel: 1 px = just the
@@ -71,6 +90,15 @@ public static class CursorRenderer
                 bool centre = x == rc.HotX && y == rc.HotY;
                 float cov = centre ? 1 : Sat(r + 0.5f - Len(x - rc.HotX, y - rc.HotY));
                 if (cov <= 0) continue;
+                if (rc.Mask != null)
+                {
+                    // Masked cursors have no partial alpha: a pixel is either the dot colour or untouched.
+                    if (cov < 0.5f) continue;
+                    int i = (y * rc.Width + x) * 4;
+                    rc.Pixels[i] = ToByte(c.B); rc.Pixels[i + 1] = ToByte(c.G); rc.Pixels[i + 2] = ToByte(c.R); rc.Pixels[i + 3] = 0;
+                    rc.Mask[y * rc.Width + x] = 0;
+                    continue;
+                }
                 BlendStraight(rc.Pixels, (y * rc.Width + x) * 4, c, centre ? 1 : cov * c.A);
             }
         }
@@ -118,9 +146,16 @@ public static class CursorRenderer
         var px = new byte[canvas * canvas * 4];
         int cw = Math.Min(canvas, rc.Width), ch = Math.Min(canvas, rc.Height);
         for (int y = 0; y < ch; y++) Buffer.BlockCopy(rc.Pixels, y * rc.Width * 4, px, y * canvas * 4, cw * 4);
+        byte[]? mask = null;
+        if (rc.Mask != null)
+        {
+            mask = new byte[canvas * canvas];
+            Array.Fill(mask, (byte)1); // padding keeps the screen
+            for (int y = 0; y < ch; y++) Buffer.BlockCopy(rc.Mask, y * rc.Width, mask, y * canvas, cw);
+        }
         return new RenderedCursor
         {
-            Width = canvas, Height = canvas, Pixels = px,
+            Width = canvas, Height = canvas, Pixels = px, Mask = mask,
             HotX = Math.Min(rc.HotX, canvas - 1), HotY = Math.Min(rc.HotY, canvas - 1),
         };
     }
@@ -148,15 +183,25 @@ public static class CursorRenderer
     }
 
     /// <summary>Renders a flat (no glow / shadow) version that fits and is centered in a px*px square.</summary>
-    public static RenderedCursor RenderIcon(CursorStyle style, int px)
+    public static RenderedCursor RenderIcon(CursorStyle style, int px, CursorRole role = CursorRole.Pointer)
     {
+        style = style.ForDisplay(darkBackground: true);
+        // Resolve a state's icon choice to "a shape drawn as the pointer" or "the state's own glyph".
+        string glyph = style.GlyphFor(role);
+        if (role != CursorRole.Pointer && glyph == CursorStyle.GlyphPointer) role = CursorRole.Pointer;
+        else if (role != CursorRole.Pointer && glyph != CursorStyle.GlyphDefault && Enum.TryParse<CursorShape>(glyph, out var shape))
+        {
+            style = style.Clone();
+            style.Shape = shape;
+            role = CursorRole.Pointer;
+        }
         px = Math.Clamp(px, 8, MaxCanvas);
         int size = px;
         RenderedCursor rc;
         (int x0, int y0, int x1, int y1) bb;
         while (true)
         {
-            rc = RenderCore(style, size, glow: false, shadow: false);
+            rc = RenderCore(style, size, glow: false, shadow: false, role);
             bb = Bounds(rc);
             int ext = Math.Max(bb.x1 - bb.x0, bb.y1 - bb.y0);
             if (ext <= px || size <= 4) break;
@@ -207,6 +252,9 @@ public static class CursorRenderer
         }
 
         size = Math.Clamp(size, 4, 200);
+        // Inverted cursors are masked cursors (AND/XOR, no alpha): no soft glow or shadow possible.
+        bool invert = s.IsInverted;
+        if (invert) glow = shadow = false;
         var g = Geometry.ForRole(s.Shape, role, size, frame);
         var fill = Rgba.Parse(s.Fill);
         var outline = Rgba.Parse(s.Outline);
@@ -234,6 +282,12 @@ public static class CursorRenderer
         int dim = Math.Clamp(Math.Max(w, h), 1, MaxCanvas);
 
         var px = new byte[dim * dim * 4];
+        byte[]? mask = null;
+        if (invert)
+        {
+            mask = new byte[dim * dim];
+            Array.Fill(mask, (byte)1);
+        }
         for (int y = 0; y < dim; y++)
         {
             float py = y + 0.5f - oy;
@@ -241,6 +295,25 @@ public static class CursorRenderer
             {
                 float pxx = x + 0.5f - ox;
                 float d = g.Sdf(pxx, py);
+
+                if (mask != null)
+                {
+                    // Masked: fill pixels invert the screen (AND 1, XOR white), outline / accent pixels are solid
+                    // (AND 0, XOR colour), everything else is left alone (AND 1, XOR 0).
+                    int mi = y * dim + x, pi = mi * 4;
+                    float accent = g.Accent != null ? Sat(0.5f - g.Accent(pxx, py)) : 0;
+                    Rgba? solid = null;
+                    if (accent >= 0.5f) solid = outline.A > 0 ? outline : new Rgba(1, 1, 1, 1);
+                    else if (Sat(0.5f - d) >= 0.5f) { px[pi] = px[pi + 1] = px[pi + 2] = 255; continue; }
+                    else if (ow > 0 && outline.A >= 0.5f && Sat(0.5f - (d - ow)) >= 0.5f) solid = outline;
+                    if (solid is { } sc)
+                    {
+                        px[pi] = ToByte(sc.B); px[pi + 1] = ToByte(sc.G); px[pi + 2] = ToByte(sc.R);
+                        mask[mi] = 0;
+                    }
+                    continue;
+                }
+
                 var acc = new Acc();
 
                 if (shadow)
@@ -282,7 +355,7 @@ public static class CursorRenderer
         float hotX = g.HotX + g.TipDirX * reach, hotY = g.HotY + g.TipDirY * reach;
         int hx = Math.Clamp((int)MathF.Floor(hotX + ox), 0, dim - 1);
         int hy = Math.Clamp((int)MathF.Floor(hotY + oy), 0, dim - 1);
-        return new RenderedCursor { Width = dim, Height = dim, HotX = hx, HotY = hy, Pixels = px };
+        return new RenderedCursor { Width = dim, Height = dim, HotX = hx, HotY = hy, Pixels = px, Mask = mask };
     }
 
     static RenderedCursor? RenderCustom(CursorStyle s, int size)

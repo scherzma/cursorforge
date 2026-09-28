@@ -120,7 +120,7 @@
                             </DockPanel>
                             <WrapPanel x:Name="StatesPanel" Margin="0,14,0,0"/>
                             <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0"
-                                       Text="Link, text, busy, resize and the rest are drawn to match your pointer. Choose which states to replace under Settings."/>
+                                       Text="Click a state to give it a different icon. Choose which states to replace under Settings."/>
                         </StackPanel>
                     </Border>
 
@@ -158,6 +158,8 @@
                             <StackPanel x:Name="VectorOptions">
                                 <TextBlock Text="Fill" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/>
                                 <ContentControl x:Name="FillHost" Focusable="False"/>
+                                <TextBlock x:Name="InvertHint" Style="{StaticResource Hint}" Margin="0,8,0,0" Visibility="Collapsed"
+                                           Text="Inverted cursors are Windows masked cursors: hard edges, no glow or shadow. Outline and hotspot dot stay solid."/>
 
                                 <DockPanel Margin="0,18,0,8">
                                     <TextBlock x:Name="OutlineValue" DockPanel.Dock="Right" Style="{StaticResource ValueText}"/>

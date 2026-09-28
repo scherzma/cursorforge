@@ -110,7 +110,8 @@ internal static unsafe class Program
     static RenderedCursor RenderSafe()
     {
         // Same size as the scheme cursors, so the game overlay matches the desktop cursor.
-        try { return CursorRenderer.Render(CursorRenderer.Effective(_cfg.Style, CursorRenderer.MaxCanvas)); }
+        // (An overlay window can't invert what's behind it, so inverted styles get their light stand-in.)
+        try { return CursorRenderer.Render(CursorRenderer.Effective(_cfg.Style, CursorRenderer.MaxCanvas).ForDisplay(darkBackground: true)); }
         catch { return CursorRenderer.Render(Presets.Default.Style); }
     }
 
