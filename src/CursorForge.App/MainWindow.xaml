@@ -327,6 +327,8 @@
                             </StackPanel>
                             <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0"
                                        Text="Stopping the agent restores your normal Windows cursors right away."/>
+                            <Button x:Name="UninstallButton" Style="{StaticResource BtnGhost}" Content="Uninstall CursorForge…"
+                                    HorizontalAlignment="Left" Margin="-10,10,0,0" Click="OnUninstall" Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>

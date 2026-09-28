@@ -21,4 +21,9 @@
     <ProjectReference Include="..\CursorForge.Core\CursorForge.Core.csproj" />
   </ItemGroup>
 
+  <!-- Release download: the agent travels inside the single exe (build.ps1 -Release sets EmbedAgent). -->
+  <ItemGroup Condition="'$(EmbedAgent)' != ''">
+    <EmbeddedResource Include="$(EmbedAgent)" LogicalName="CursorForge.Agent.exe" />
+  </ItemGroup>
+
 </Project>

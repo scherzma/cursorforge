@@ -9,6 +9,13 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Release builds are a single downloadable exe that installs itself (see Installer).
+        if (!Installer.Run(e.Args))
+        {
+            Shutdown();
+            return;
+        }
+
         _mutex = new Mutex(true, Ipc.UiMutex, out bool owned);
         if (!owned)
         {

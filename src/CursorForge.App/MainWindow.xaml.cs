@@ -73,6 +73,7 @@ public partial class MainWindow : Window
             _ready = true;
             LoadIntoControls();
             UpdateAgentStatus();
+            UninstallButton.Visibility = Installer.IsInstalledCopy ? Visibility.Visible : Visibility.Collapsed;
             _statusTimer.Start();
             _spinTimer.Start();
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { PresetScroll.ScrollToTop(); SideScroll.ScrollToTop(); });
@@ -811,6 +812,13 @@ public partial class MainWindow : Window
         else AgentClient.Start();
         await Task.Delay(400);
         UpdateAgentStatus();
+    }
+
+    void OnUninstall(object sender, RoutedEventArgs e)
+    {
+        if (_saveTimer.IsEnabled) { _saveTimer.Stop(); Commit(); }
+        Installer.Uninstall(askFirst: true);
+        if (!Directory.Exists(Installer.InstallDir) || !AgentClient.IsRunning) Application.Current.Shutdown();
     }
 
     async void OnAgentRestart(object sender, RoutedEventArgs e)
