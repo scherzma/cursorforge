@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     double _ppd = 1;
     readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
     readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(2) };
-    readonly ColorRow _fill = new(), _outline = new(), _glow = new(), _flashLeft = new(), _flashRight = new();
+    readonly ColorRow _fill = new(), _outline = new(), _glow = new(), _flashLeft = new(), _flashRight = new(), _hotDot = new();
     readonly List<(RadioButton Button, Preset Preset)> _presetButtons = [];
     readonly Dictionary<CursorShape, (RadioButton Button, Image? Icon)> _shapeButtons = [];
     readonly Dictionary<CursorRole, Image> _stateImages = [];
@@ -40,6 +40,8 @@ public partial class MainWindow : Window
         FillHost.Content = _fill;
         OutlineHost.Content = _outline;
         GlowHost.Content = _glow;
+        HotDotHost.Content = _hotDot;
+        _hotDot.Changed += OnInput;
         FlashLeftHost.Content = _flashLeft;
         FlashRightHost.Content = _flashRight;
         _flashLeft.Changed += OnInput;
@@ -227,6 +229,8 @@ public partial class MainWindow : Window
             _fill.Value = s.Fill;
             _outline.Value = s.Outline;
             _glow.Value = s.GlowColor;
+            HotDotSwitch.IsChecked = s.HotspotDot;
+            _hotDot.Value = s.HotspotDotColor;
             FlashSwitch.IsChecked = _cfg.ClickFlash.Enabled;
             _flashLeft.Value = _cfg.ClickFlash.LeftColor;
             _flashRight.Value = _cfg.ClickFlash.RightColor;
@@ -272,6 +276,8 @@ public partial class MainWindow : Window
         s.Fill = _fill.Value;
         s.Outline = _outline.Value;
         s.GlowColor = _glow.Value;
+        s.HotspotDot = HotDotSwitch.IsChecked == true;
+        s.HotspotDotColor = _hotDot.Value;
         _cfg.ClickFlash.Enabled = FlashSwitch.IsChecked == true;
         _cfg.ClickFlash.LeftColor = _flashLeft.Value;
         _cfg.ClickFlash.RightColor = _flashRight.Value;
@@ -312,6 +318,7 @@ public partial class MainWindow : Window
         GlowStrengthValue.Text = $"{s.GlowStrength * 100:0}%";
         OpacityValue.Text = $"{s.Opacity * 100:0}%";
         GlowPanel.Visibility = s.Glow ? Visibility.Visible : Visibility.Collapsed;
+        HotDotHost.Visibility = s.HotspotDot ? Visibility.Visible : Visibility.Collapsed;
         bool custom = s.Shape == CursorShape.Custom;
         CustomPanel.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
         VectorOptions.Visibility = custom ? Visibility.Collapsed : Visibility.Visible;

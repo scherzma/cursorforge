@@ -42,7 +42,7 @@ public static class CursorRenderer
     public const int SpinnerFrames = 20, SpinnerJiffies = 3;
 
     public static RenderedCursor Render(CursorStyle style) =>
-        RenderCore(style, style.Size, style.Glow, style.Shadow);
+        WithHotspotDot(style, RenderCore(style, style.Size, style.Glow, style.Shadow));
 
     public static bool IsAnimated(CursorRole role) => role is CursorRole.Busy or CursorRole.Working;
 
@@ -50,7 +50,20 @@ public static class CursorRenderer
     public static RenderedCursor RenderRole(CursorStyle style, CursorRole role, int frame = 0) =>
         role == CursorRole.Pointer
             ? Render(style)
-            : RenderCore(style, style.Size, style.Glow, style.Shadow, role, frame);
+            : WithHotspotDot(style, RenderCore(style, style.Size, style.Glow, style.Shadow, role, frame));
+
+    /// <summary>Paints the hotspot pixel (where Windows delivers the click) in the dot colour, fully opaque.</summary>
+    static RenderedCursor WithHotspotDot(CursorStyle style, RenderedCursor rc)
+    {
+        if (!style.HotspotDot) return rc;
+        var c = Rgba.Parse(style.HotspotDotColor);
+        int i = (rc.HotY * rc.Width + rc.HotX) * 4;
+        rc.Pixels[i + 0] = ToByte(c.B);
+        rc.Pixels[i + 1] = ToByte(c.G);
+        rc.Pixels[i + 2] = ToByte(c.R);
+        rc.Pixels[i + 3] = 255;
+        return rc;
+    }
 
     /// <summary>
     /// Renders one frame for a Windows cursor scheme file: exactly canvas x canvas pixels. Windows shows the

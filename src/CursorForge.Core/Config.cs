@@ -42,6 +42,9 @@ public sealed class CursorStyle
     public float GlowStrength { get; set; } = 0.7f;
     public bool Shadow { get; set; } = true;
     public float Opacity { get; set; } = 1f;
+    /// <summary>Marks the hotspot (the exact pixel a click lands on) with a single opaque pixel.</summary>
+    public bool HotspotDot { get; set; }
+    public string HotspotDotColor { get; set; } = "#FFFF3B30";
     /// <summary>Hotspot of a custom image as a fraction of its size (0..1).</summary>
     public float CustomHotX { get; set; }
     public float CustomHotY { get; set; }
@@ -152,6 +155,7 @@ public sealed class AppConfig
         s.Fill = Rgba.TryParse(s.Fill, out _) ? s.Fill : "#FFFFFFFF";
         s.Outline = Rgba.TryParse(s.Outline, out _) ? s.Outline : "#FF000000";
         s.GlowColor = Rgba.TryParse(s.GlowColor, out _) ? s.GlowColor : "#FF22D3EE";
+        s.HotspotDotColor = Rgba.TryParse(s.HotspotDotColor, out _) ? s.HotspotDotColor : "#FFFF3B30";
         OverlayApps.RemoveAll(a => a is null || string.IsNullOrWhiteSpace(a.Process));
     }
 }
