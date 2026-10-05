@@ -138,6 +138,18 @@ internal sealed unsafe class ClickFlasher
     void EndFlash()
     {
         _flashing = false;
-        SystemParametersInfo(SPI_SETCURSORS, 0, 0, 0); // back to the normal (scheme) cursors
+        // Put back just the flashed cursors from their scheme files (same sharp LR_DEFAULTSIZE path). Cheaper than
+        // a full scheme reload, which would also re-read the large animated busy cursors on every click.
+        var s = _settings;
+        if (s == null)
+        {
+            SystemParametersInfo(SPI_SETCURSORS, 0, 0, 0);
+            return;
+        }
+        foreach (var (role, id) in s.Roles)
+        {
+            nint h = LoadImage(0, SchemeCursors.FilePath(s.Dir, role), IMAGE_CURSOR, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
+            if (h != 0 && SetSystemCursor(h, id) == 0) DestroyCursor(h);
+        }
     }
 }

@@ -5,7 +5,7 @@ namespace CursorForge.Agent;
 internal static unsafe partial class Native
 {
     // ---- messages ----
-    public const uint WM_NULL = 0x0000, WM_DESTROY = 0x0002, WM_SETTINGCHANGE = 0x001A, WM_DISPLAYCHANGE = 0x007E,
+    public const uint WM_NULL = 0x0000, WM_QUIT = 0x0012, WM_DESTROY = 0x0002, WM_SETTINGCHANGE = 0x001A, WM_DISPLAYCHANGE = 0x007E,
         WM_NCHITTEST = 0x0084, WM_TIMER = 0x0113, WM_HOTKEY = 0x0312, WM_POWERBROADCAST = 0x0218,
         WM_WTSSESSION_CHANGE = 0x02B1, WM_LBUTTONUP = 0x0202, WM_RBUTTONUP = 0x0205, WM_CONTEXTMENU = 0x007B,
         WM_DPICHANGED = 0x02E0;
@@ -204,6 +204,15 @@ internal static unsafe partial class Native
     [LibraryImport("kernel32.dll", EntryPoint = "Process32NextW")] public static partial int Process32Next(nint snap, PROCESSENTRY32W* e);
     [LibraryImport("kernel32.dll")] public static partial int CloseHandle(nint h);
     [LibraryImport("dwmapi.dll")] public static partial int DwmFlush();
+
+    // ---- registry change notifications ----
+    public static readonly nint HKEY_CURRENT_USER = unchecked((int)0x80000001); // sign-extended predefined handle
+    public const uint KEY_NOTIFY = 0x0010, REG_NOTIFY_CHANGE_LAST_SET = 0x4;
+    [LibraryImport("advapi32.dll", EntryPoint = "RegOpenKeyExW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int RegOpenKeyEx(nint key, string subKey, uint options, uint access, nint* result);
+    [LibraryImport("advapi32.dll")]
+    public static partial int RegNotifyChangeKeyValue(nint key, int watchSubtree, uint filter, nint evt, int asynchronous);
+    [LibraryImport("advapi32.dll")] public static partial int RegCloseKey(nint key);
 
     // ---- input state (click flash) ----
     [StructLayout(LayoutKind.Sequential)] public struct LASTINPUTINFO { public uint cbSize, dwTime; }

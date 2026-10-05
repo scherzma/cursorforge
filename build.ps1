@@ -4,7 +4,7 @@
 .PARAMETER Install
   Also copies the build to %LOCALAPPDATA%\Programs\CursorForge, adds a Start-menu shortcut and launches it.
 .PARAMETER Release
-  Also builds .elease\CursorForge.exe: one self-contained download (no .NET needed) with the agent embedded.
+  Also builds .\release\CursorForge.exe: one self-contained download (no .NET needed) with the agent embedded.
   It installs itself for the current user on first run.
 .PARAMETER Uninstall
   Stops the agent, removes autostart, the shortcut and the installed files (settings in %APPDATA% are kept).

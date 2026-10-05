@@ -12,7 +12,8 @@ namespace CursorForge.Agent;
 internal static unsafe class Program
 {
     const int HotkeyToggle = 1, HotkeyOverlay = 2;
-    const nuint TimerReapply = 1, TimerTrayRetry = 2;
+    const nuint TimerReapply = 1, TimerTrayRetry = 2, TimerVerify = 3, TimerStartupCheck = 4;
+    static readonly uint[] StartupCheckDelays = [5_000, 15_000, 40_000]; // re-checks at +5 s, +20 s, +60 s
     const uint MenuOpen = 1, MenuEnabled = 2, MenuExit = 3;
 
     static AppConfig _cfg = new();
@@ -22,7 +23,9 @@ internal static unsafe class Program
     static ClickFlasher _flasher = null!;
     static uint _taskbarCreated;
     static long _lastApplyTick;
-    static int _trayRetries;
+    static int _trayRetries, _startupChecks;
+    static nint _cursorsKey;
+    static readonly AutoResetEvent _cursorsChanged = new(false);
 
     static int Main(string[] args)
     {
@@ -77,13 +80,29 @@ internal static unsafe class Program
 
         ApplyAll();
         if (!_tray.Added) SetTimer(_hwnd, TimerTrayRetry, 2000, 0);
+        WatchCursorsKey();
+        SetTimer(_hwnd, TimerStartupCheck, StartupCheckDelays[0], 0);
 
+        // Message loop that also wakes when HKCU\Control Panel\Cursors changes.
         MSG msg;
-        while (GetMessage(&msg, 0, 0, 0) > 0)
+        nint changed = _cursorsChanged.SafeWaitHandle.DangerousGetHandle();
+        while (true)
         {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            if (MsgWaitForMultipleObjectsEx(1, &changed, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE) == 0)
+            {
+                WatchCursorsKey(); // notifications are one-shot: re-arm, then check
+                ScheduleVerify();
+            }
+            bool quit = false;
+            while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE) != 0)
+            {
+                if (msg.message == WM_QUIT) { quit = true; break; }
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+            if (quit) break;
         }
+        if (_cursorsKey != 0) RegCloseKey(_cursorsKey);
 
         if (_winEventHook != 0) UnhookWinEvent(_winEventHook);
         _overlay.Stop();
@@ -142,6 +161,26 @@ internal static unsafe class Program
     }
 
     static void ScheduleReapply() => SetTimer(_hwnd, TimerReapply, 400, 0);
+
+    /// <summary>Debounced check that our scheme is still in place (cheap: a few registry reads).</summary>
+    static void ScheduleVerify() => SetTimer(_hwnd, TimerVerify, 300, 0);
+
+    static void VerifyScheme()
+    {
+        if (_cfg.Enabled && !SchemeCursors.IsIntact(_cfg)) ApplyCursors(RenderSafe());
+    }
+
+    static void WatchCursorsKey()
+    {
+        if (_cursorsKey == 0)
+        {
+            nint key;
+            if (RegOpenKeyEx(HKEY_CURRENT_USER, @"Control Panel\Cursors", 0, KEY_NOTIFY, &key) != 0) return;
+            _cursorsKey = key;
+        }
+        RegNotifyChangeKeyValue(_cursorsKey, 0, REG_NOTIFY_CHANGE_LAST_SET,
+            _cursorsChanged.SafeWaitHandle.DangerousGetHandle(), 1);
+    }
 
     static void RegisterHotkeys()
     {
@@ -300,6 +339,18 @@ internal static unsafe class Program
                         KillTimer(hwnd, TimerReapply);
                         if (_cfg.Enabled) ApplyCursors(RenderSafe());
                     }
+                    else if (w == (nint)TimerVerify)
+                    {
+                        KillTimer(hwnd, TimerVerify);
+                        VerifyScheme();
+                    }
+                    else if (w == (nint)TimerStartupCheck)
+                    {
+                        KillTimer(hwnd, TimerStartupCheck);
+                        VerifyScheme();
+                        if (++_startupChecks < StartupCheckDelays.Length)
+                            SetTimer(hwnd, TimerStartupCheck, StartupCheckDelays[_startupChecks], 0);
+                    }
                     else if (w == (nint)TimerTrayRetry)
                     {
                         _tray.Readd();
@@ -308,9 +359,10 @@ internal static unsafe class Program
                     return 0;
 
                 case WM_SETTINGCHANGE:
-                    // Windows reloaded the cursor scheme (Settings app, accessibility size, etc.) -> put ours back.
-                    // (0x2029 = pointer size changed in Settings.)
-                    if ((uint)w is SPI_SETCURSORS or 0x2029 && Environment.TickCount64 - _lastApplyTick > 1000) ScheduleReapply();
+                    // Something changed system settings (Settings app, a theme, pointer size, ...): make sure our
+                    // scheme is still the active one. No time window is ignored - at sign-in the theme can re-apply
+                    // its cursors right after our first apply.
+                    ScheduleVerify();
                     break;
 
                 case WM_DISPLAYCHANGE:

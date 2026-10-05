@@ -30,6 +30,9 @@ internal static class SchemeCursors
 
     static string CursorsDir => Path.Combine(ConfigStore.Dir, "cursors");
 
+    /// <summary>Settings + user pointer size the current files were made for (cheap staleness check).</summary>
+    static (string Config, int BaseSize)? _appliedFor;
+
     /// <summary>Folder of the currently applied cursor files (null when not applied).</summary>
     public static string? CurrentDir { get; private set; }
 
@@ -63,13 +66,46 @@ internal static class SchemeCursors
         SystemParametersInfo(SPI_SETCURSORBASESIZE, 0, baseSize, 0);
         SystemParametersInfo(SPI_SETCURSORS, 0, 0, 0);
         CurrentDir = dir;
+        _appliedFor = (ConfigStore.Serialize(cfg), WindowsPointer.BaseSize());
         DeleteStale(dir);
+    }
+
+    /// <summary>
+    /// Whether the registry still points every replaced state at the files for the current settings. Other software
+    /// (notably the Windows theme being re-applied at sign-in when "Allow themes to change mouse pointers" is on)
+    /// can overwrite the scheme at any time; then the next scheme reload shows the Windows cursors again.
+    /// </summary>
+    public static bool IsIntact(AppConfig cfg)
+    {
+        try
+        {
+            // Settings or the user's pointer size changed since the files were made -> need new files anyway.
+            if (CurrentDir is not { } dir || _appliedFor != (ConfigStore.Serialize(cfg), WindowsPointer.BaseSize())) return false;
+            using var key = Registry.CurrentUser.OpenSubKey(KeyPath);
+            if (key == null) return false;
+            var selected = CursorRoles.Selected(cfg).Select(r => r.Role).ToHashSet();
+            foreach (var (role, value) in Values)
+            {
+                if (!selected.Contains(role)) continue;
+                string? current = key.GetValue(value, null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
+                string expected = FilePath(dir, role);
+                if (current == null || !string.Equals(Environment.ExpandEnvironmentVariables(current), expected, StringComparison.OrdinalIgnoreCase)
+                    || !File.Exists(expected))
+                    return false;
+            }
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Puts the user's previous cursor scheme back.</summary>
     public static void Restore()
     {
         CurrentDir = null;
+        _appliedFor = null;
         try
         {
             var backup = ReadBackup();
@@ -131,7 +167,7 @@ internal static class SchemeCursors
         File.WriteAllText(Path.Combine(dir, "complete"), "");
     }
 
-    static string FilePath(string dir, CursorRole role) =>
+    public static string FilePath(string dir, CursorRole role) =>
         Path.Combine(dir, role.ToString().ToLowerInvariant() + (CursorRenderer.IsAnimated(role) ? ".ani" : ".cur"));
 
     /// <summary>Everything the generated files depend on, so unchanged settings reuse the cached files.</summary>
